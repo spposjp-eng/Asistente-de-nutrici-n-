@@ -3,7 +3,7 @@
    - Librerías de CDN (PDF.js, MediaPipe): se guardan la primera vez y se sirven desde caché.
    - La API de Groq nunca se cachea.
    - El modelo local (Gemma) lo guarda la app en su propia caché 'ns-local-model'. */
-const VERSION = 'ns-shell-v1';
+const VERSION = 'ns-shell-v2';
 const RUNTIME = 'ns-runtime';
 const MODEL_CACHE = 'ns-local-model';
 const SHELL = [
