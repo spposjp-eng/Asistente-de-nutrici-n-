@@ -631,7 +631,7 @@ const MODEL        = 'llama-3.3-70b-versatile'; // preferido; si Groq lo da de b
 // Si falla, se cae al MODEL de texto con la descripción "[El usuario envió una foto...]".
 const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
 const STORE_KEY    = 'ns_v4';
-const APP_VERSION  = '2.1 · 16 nov 2026'; // subir en cada cambio para verificar que el celular se actualizó
+const APP_VERSION  = '2.2 · 16 nov 2026'; // subir en cada cambio para verificar que el celular se actualizó
 const FORMAT_REMINDER = '(Respondé de vos, como en Salta (probá, sumá, acompañá; nunca "añade" ni "prueba"), en máximo 4 líneas, una sola idea, sin listas ni tablas. Terminá con un 👉 de una sola acción.)';
 const MAX_REPLY_CHARS = 420;
 const MAX_SAVED    = 60;   // msgs guardados
@@ -958,8 +958,113 @@ function buildPortionAsk(text){
   return { question, options };
 }
 function answerAsk(m, opt){
+  if(m.ask.flow === 'clarify') return answerClarify(m, opt.label, opt.text);
   m.ask.answered = opt.label; save();
   $('#txt').value = opt.text; updateSend(); send();
+}
+
+/* ===================== REGISTRO CON CONTEXTO =====================
+   Antes de anotar, la IA revisa si falta algo que cambie mucho las calorías
+   (cantidad, preparación, relleno/tipo, agregados) y pregunta de a una, con botones.
+   Máximo 2 preguntas; después estima con supuestos razonables. */
+const MAX_CLARIFY = 2;
+async function clarifyFood(st){
+  const force = st.rounds >= MAX_CLARIFY;
+  const prompt = `Vas a registrar en el diario lo que comió ${S.name} (${S.age} años, artrosis).
+Lo que sabemos hasta ahora: "${st.desc}"
+
+Para estimar bien hace falta: qué alimentos, cantidad o tamaño, cómo estaba preparado (frito, al horno, a la plancha, hervido, guiso), relleno o variedad si cambia mucho (carne, pollo, queso, verdura), y agregados importantes (aderezos, salsas, queso extra, pan, bebida).
+${force
+  ? 'Ya preguntaste lo suficiente: estimá AHORA con supuestos razonables (porciones caseras típicas del NOA).'
+  : 'Si falta un dato que cambia el cálculo en más de un 20%, devolvé UNA sola pregunta corta, de vos, sobre lo más importante que falta, con 3 a 5 opciones cortas (máximo 28 caracteres cada una). No preguntes lo que ya se sabe. Si ya alcanza, estimá.'}
+
+Respondé SOLO JSON, una de estas dos formas:
+{"listo":false,"pregunta":"¿Las empanadas eran fritas o al horno?","opciones":["Al horno","Fritas","No sé"]}
+{"listo":true,"items":[{"nombre":"Empanada salteña de carne al horno","porcion":"2 unidades","kcal":400,"proteinas_g":18,"carbohidratos_g":40,"grasas_g":18}],"supuestos":"frase muy corta con lo que asumiste, o vacío"}
+Un ítem por alimento. Números sin unidades. Porciones caseras típicas del noroeste argentino.`;
+  const { text: raw } = await aiChat([
+    { role:'system', content:'Sos un nutricionista que registra comidas. Respondés solo JSON válido.' },
+    { role:'user', content: prompt }
+  ], { json:true, temperature:0.2, max_tokens:700, allowLocal:false });
+  let j; try{ j = JSON.parse(raw); }catch(_){ const m = raw.match(/\{[\s\S]*\}/); j = m ? JSON.parse(m[0]) : {}; }
+  const num = v => { const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) && n >= 0 ? n : 0; };
+  if(!force && j.listo === false && j.pregunta){
+    const opts = (Array.isArray(j.opciones) ? j.opciones : []).map(o => clean(o).slice(0, 32)).filter(Boolean).slice(0, 5);
+    if(opts.length >= 2 && !FORBIDDEN.test(j.pregunta)) return { ask: clean(j.pregunta).slice(0, 140), options: opts };
+  }
+  const items = (Array.isArray(j.items) ? j.items : []).map(i => ({
+    name: clean(i.nombre).slice(0, 60), qty: clean(i.porcion).slice(0, 40),
+    kcal: Math.min(4000, num(i.kcal)), p: num(i.proteinas_g), c: num(i.carbohidratos_g), f: num(i.grasas_g)
+  })).filter(i => i.name && i.kcal > 0 && !FORBIDDEN.test(i.name)).slice(0, 12);
+  return { items, assumed: clean(j.supuestos).slice(0, 140) };
+}
+
+async function runClarify(st){
+  setBusy(true);
+  const typingRow = showTyping();
+  setStatusText('Revisando qué comiste…');
+  let r;
+  try{
+    r = await clarifyFood(st);
+  }catch(e){
+    // Sin IA disponible: preguntas simples de la app (solo la primera vez) y tabla local
+    console.warn('[NutriSalta] Registro con IA no disponible, uso lo local:', e.message);
+    const ask = st.rounds === 0 ? buildPortionAsk(st.desc) : null;
+    if(ask) r = { ask: ask.question, options: ask.options.map(o => o.label), local: ask.options };
+    else r = { items: localEstimate(st.desc), assumed: 'estimación aproximada sin conexión' };
+  }
+  typingRow.remove();
+
+  if(r.ask){
+    const q = { role:'assistant', content: r.ask, ts: Date.now(),
+      ask: { flow:'clarify', state: st, question: r.ask, options: r.options.map((label, i) => ({ label, text: r.local ? r.local[i].text : label })) } };
+    S.msgs.push(q); save(); renderMsg(q);
+    setBusy(false); setStatus(true);
+    return;
+  }
+  if(!r.items || !r.items.length){
+    const q = { role:'assistant', content:'No llegué a entender qué comiste para anotarlo. ¿Me lo contás con un poco más de detalle? 🙂', ts: Date.now() };
+    S.msgs.push(q); save(); renderMsg(q); setBusy(false); setStatus(true);
+    return;
+  }
+  // Anotar y pedir el comentario corto al asistente
+  const logged = logFoods(r.items.map(x => Object.assign(x, { meal: st.meal })));
+  const desc = r.items.map(x => `${x.qty ? x.qty + ' de ' : ''}${x.name} (${Math.round(x.kcal)} kcal)`).join(', ');
+  const typing2 = showTyping();
+  setStatusText('Escribiendo…');
+  let body, engine = 'groq';
+  try{
+    const ctx = S.msgs.slice(-CTX_MSGS).map(m => ({ role:m.role, content: m.role === 'assistant' ? String(m.content).slice(0, 350) : m.content }));
+    ctx.push({ role:'user', content: `[La app ya anotó en el diario (${(MEALS.find(m => m.id === st.meal) || {}).name}): ${desc}.${r.assumed ? ' Supuestos: ' + r.assumed + '.' : ''} Confirmalo en una línea y dá una sola sugerencia. No agregues etiquetas [[COMIDA]].]\n\n${FORMAT_REMINDER}` });
+    const res = await aiChat([{ role:'system', content: systemPrompt() }, ...ctx], { ctx, att:null });
+    engine = res.engine;
+    if(engine === 'reglas') throw new Error('sin modelo');   // las respuestas básicas no sirven para confirmar
+    const mem = absorbMemory(res.text.replace(/\[\[\s*COMIDA[^\]]*\]\]/gi, ''));
+    body = enforceFormat(mem.body);
+  }catch(e){
+    const short = r.items.map(x => `${x.qty ? x.qty + ' de ' : ''}${x.name.toLowerCase()}`).join(' y ');
+    body = `Listo, anoté ${short} en ${((MEALS.find(m => m.id === st.meal) || {}).name || '').toLowerCase()} 👌\n👉 Acompañá con un vaso de agua.`;
+  }
+  typing2.remove();
+  body = body.replace(/\n?(👉[^\n]*)$/u, '\n' + todayLine() + '\n$1');
+  if(!body.includes('📊')) body += '\n' + todayLine();
+  if(r.assumed) body = body.replace(/\n📊/, `\n*Supuse: ${r.assumed}*\n📊`);
+  const bot = { role:'assistant', content: body, ts: Date.now(), logged };
+  if(engine !== 'groq') bot.engine = engine;
+  S.msgs.push(bot); save(); renderMsg(bot);
+  setBusy(false); setStatus(engine === 'groq' || PROVIDER_NAMES[engine] ? true : 'offline');
+  refreshPanels();
+}
+
+function answerClarify(m, label, fullText){
+  m.ask.answered = label; save();
+  const um = { role:'user', content: label, shown: label, ts: Date.now() };
+  S.msgs.push(um); S.nMsgs++; save(); renderMsg(um);
+  const st = Object.assign({}, m.ask.state);
+  // Si la respuesta vino de los botones locales, ya trae la frase completa ("Comí 2 porciones de pizza")
+  st.desc = fullText && fullText !== label ? fullText : `${st.desc}. ${m.ask.question} ${label}`;
+  st.rounds = (st.rounds || 0) + 1;
+  return runClarify(st);
 }
 
 /* --- Resúmenes con los números reales del diario --- */
@@ -1245,6 +1350,13 @@ async function send(){
   const att = pending;
   if(!text && !att) return;
 
+  // Si hay una pregunta de registro sin contestar, lo que escribe es la respuesta
+  const lastAsk = [...S.msgs].reverse().find(m => m.role === 'assistant');
+  if(!att && text && lastAsk && lastAsk.ask && lastAsk.ask.flow === 'clarify' && !lastAsk.ask.answered && !/[¿?]/.test(text)){
+    txtEl.value = ''; autosize(); txtEl.placeholder = 'Preguntame lo que quieras sobre comida…';
+    return answerClarify(lastAsk, text);
+  }
+
   // Construyo contenido para el modelo y para mostrar
   let apiContent = text;
   let shown = text;
@@ -1271,14 +1383,9 @@ async function send(){
   txtEl.value = ''; autosize(); clearPending();
   renderMsg(userMsg, att && att.type === 'img' ? att.dataUrl : null);
 
-  // "Comí una pizza" sin cantidad → la app pregunta la porción antes de anotar (sin llamar al modelo)
+  // Contó que comió algo → antes de anotar, juntar el contexto que falta (cantidad, preparación, tipo, agregados)
   if(!att && text && isIntake(text)){
-    const ask = buildPortionAsk(text);
-    if(ask){
-      const q = { role:'assistant', content: ask.question, ask, ts: Date.now() + 1 };
-      S.msgs.push(q); save(); renderMsg(q);
-      return;
-    }
+    return runClarify({ desc: text, rounds: 0, meal: mealFromText(text) || mealByHour() });
   }
 
   setBusy(true);
@@ -1686,7 +1793,7 @@ function renderMsg(m, imgUrl, noScroll){
   const eng = !m.engine ? '' : PROVIDER_NAMES[m.engine] ? ' · vía ' + esc(PROVIDER_NAMES[m.engine]) : ' · sin conexión (' + esc(ENGINE_NAMES[m.engine] || m.engine) + ')';
   inner += `<span class="meta">${fmtTime(m.ts)}${eng}</span>`;
   if(m.role !== 'user' && m.ask && !m.ask.answered){
-    inner += `<div class="ask-chips">${m.ask.options.map((o, i) => `<button class="chip" data-ask="${i}">${esc(o.label)}</button>`).join('')}<button class="chip ghost" data-ask-other="1">Otra cantidad</button></div>`;
+    inner += `<div class="ask-chips">${m.ask.options.map((o, i) => `<button class="chip" data-ask="${i}">${esc(o.label)}</button>`).join('')}<button class="chip ghost" data-ask-other="1">${m.ask.flow === 'clarify' ? 'Escribirlo' : 'Otra cantidad'}</button></div>`;
   }
   if(m.role !== 'user' && m.logged && m.logged.length){
     const kc = Math.round(m.logged.reduce((a, x) => a + x.kcal, 0));
@@ -1701,7 +1808,11 @@ function renderMsg(m, imgUrl, noScroll){
     row.querySelector('.ask-chips').remove(); answerAsk(m, m.ask.options[+b.dataset.ask]);
   });
   const ao = row.querySelector('[data-ask-other]');
-  if(ao) ao.onclick = () => { m.ask.answered = 'otra'; save(); row.querySelector('.ask-chips').remove(); $('#txt').placeholder = 'Ej: comí 2 porciones y media'; $('#txt').focus(); };
+  if(ao) ao.onclick = () => {
+    row.querySelector('.ask-chips').remove();
+    if(m.ask.flow !== 'clarify'){ m.ask.answered = 'otra'; save(); }
+    $('#txt').placeholder = 'Escribí tu respuesta…'; $('#txt').focus();
+  };
   const ub = row.querySelector('[data-undo]');
   if(ub) ub.onclick = () => { undoLogged(m); const meta = row.querySelector('.bot-actions'); if(meta) meta.innerHTML = '<span>Se quitó del diario</span>'; toast('Listo, lo saqué del diario.'); };
   const lb = row.querySelector('[data-logimg]');
@@ -2412,8 +2523,8 @@ const RULES = [
 ];
 function ruleAnswer(q, att){
   const note = navigator.onLine === false
-    ? '_Sin internet: te doy una respuesta corta. Cuando vuelva la conexión puedo darte más detalle._\n\n'
-    : '_Los servicios de IA no respondieron ahora, así que te doy una respuesta corta. Probá de nuevo en un rato._\n\n';
+    ? '*Sin internet: te doy una respuesta corta. Cuando vuelva la conexión puedo darte más detalle.*\n\n'
+    : '*Los servicios de IA no respondieron ahora, así que te doy una respuesta corta. Probá de nuevo en un rato.*\n\n';
   if(att && att.type === 'img') return note + `Sin conexión no puedo ver la foto. Contame qué plato es y lo anotamos en la pestaña Hoy.\n\n👉 Mientras tanto: que la mitad del plato sean verduras.`;
   const hit = RULES.find(([re]) => re.test(q));
   return note + (hit ? hit[1](S.name) : `Ahora no tengo internet para responderte bien eso. Mientras tanto podés anotar tus comidas, el agua y cómo te sentís en la pestaña Hoy, y lo charlamos cuando vuelva la conexión.\n\n👉 Un consejo para hoy: tomá agua y sumá una verdura más en tu próxima comida.`);
