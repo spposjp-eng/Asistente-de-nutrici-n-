@@ -352,6 +352,10 @@ main{flex:1;overflow:hidden;position:relative}
 .field select{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 12px}
 .bot-actions{margin-top:8px}
 .bot-actions .btn{padding:6px 12px;font-size:var(--fs-xs)}
+.ask-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.ask-chips .chip{font-size:var(--fs-sm);padding:7px 12px;border-color:var(--brand-line);color:var(--brand);background:var(--surface)}
+.ask-chips .chip:hover{background:var(--brand-soft)}
+.ask-chips .chip.ghost{color:var(--text-2);border-color:var(--line)}
 .bot-actions.logged{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:var(--fs-xs);color:var(--ok);font-weight:600;border-top:1px solid var(--line);padding-top:8px}
 .bot-actions.logged .link{font-size:var(--fs-xs)}
 .tabs .tab{font-size:var(--fs-sm)}
@@ -386,6 +390,8 @@ main{flex:1;overflow:hidden;position:relative}
 details.adv{margin:4px 0 12px;font-size:var(--fs-sm)}
 details.adv summary{cursor:pointer;color:var(--text-2)}
 details.adv .field{margin-top:10px}
+.diag{margin:0;padding-left:18px;font-size:var(--fs-xs);color:var(--text-2)}
+.diag li{margin:3px 0}
 .check{display:flex;gap:10px;align-items:flex-start;font-size:var(--fs-sm);margin:4px 0 8px;cursor:pointer}
 .check input{margin-top:3px;accent-color:var(--brand);width:16px;height:16px;flex:none}
 
@@ -558,6 +564,7 @@ details.adv .field{margin-top:10px}
           <select id="m-model"><option value="">Automático (recomendado)</option></select>
           <span class="hint" id="m-model-hint">Se elige solo entre los que tiene tu cuenta de Groq.</span>
         </div>
+        <div class="field"><label>Estado de los servicios</label><div id="m-diag"></div></div>
         <div class="field">
           <label for="m-gkey">Clave de Google Gemini (opcional, gratis)</label>
           <input id="m-gkey" type="password" autocomplete="off" placeholder="AIza…">
@@ -624,8 +631,8 @@ const MODEL        = 'llama-3.3-70b-versatile'; // preferido; si Groq lo da de b
 // Si falla, se cae al MODEL de texto con la descripción "[El usuario envió una foto...]".
 const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
 const STORE_KEY    = 'ns_v4';
-const APP_VERSION  = '2.0 · 16 nov 2026'; // subir en cada cambio para verificar que el celular se actualizó
-const FORMAT_REMINDER = '(Respondé en máximo 4 líneas, una sola idea, sin listas ni tablas, como charlando. Terminá con un 👉 de una sola acción.)';
+const APP_VERSION  = '2.1 · 16 nov 2026'; // subir en cada cambio para verificar que el celular se actualizó
+const FORMAT_REMINDER = '(Respondé de vos, como en Salta (probá, sumá, acompañá; nunca "añade" ni "prueba"), en máximo 4 líneas, una sola idea, sin listas ni tablas. Terminá con un 👉 de una sola acción.)';
 const MAX_REPLY_CHARS = 420;
 const MAX_SAVED    = 60;   // msgs guardados
 const CTX_MSGS     = 14;   // msgs enviados como contexto
@@ -757,6 +764,7 @@ FORMATO OBLIGATORIO:
 
 CUANDO REGISTRA COMIDAS O FOTOS:
 - Si dice que comió o está comiendo algo, o manda la foto de su plato, lo anotás (ver DATOS PARA GUARDAR).
+- Si no queda claro cuánto comió, preguntás la cantidad en una línea antes de anotar.
 - Confirmás en una línea lo que anotaste.
 - La app agrega sola debajo el resumen "📊 Hoy: … kcal | 💪 Proteína: …g / meta …g" con los números reales del diario: no lo escribas vos.
 - Una sola sugerencia si algo falta.
@@ -894,6 +902,64 @@ function absorbMemory(reply){
     found.push(`${meals} (${logged.length} ${logged.length === 1 ? 'ítem' : 'ítems'}, ${kc} kcal)`);
   }
   return { body, found, logged };
+}
+
+/* --- Registro: detectar que comió algo y preguntar la porción si no la dijo --- */
+// Ojo: \b de JS no reconoce letras con tilde ("comí"), por eso los bordes van a mano
+const INTAKE_RE = /(^|[\s,¡"'(])(me com[ií]|com[ií]|almorc[eé]|cen[eé]|desayun[eé]|merend[eé]|picot[eé]|estoy comiendo|me tom[eé]|tom[eé])(?=[\s,.!:;)]|$)/i;
+const isIntake = t => INTAKE_RE.test(t) && !/[¿?]/.test(t) && !/\b(voy a|vamos a|mañana|quiero|puedo|podr[ií]a|deber[ií]a|si como)\b/i.test(t);
+function mealFromText(t){
+  t = t.toLowerCase();
+  if(/desayun/.test(t)) return 'desayuno';
+  if(/almorc|almuerzo/.test(t)) return 'almuerzo';
+  if(/merend|merienda/.test(t)) return 'merienda';
+  if(/(^|\s)(cen[eé]|cena)(?=[\s,.!]|$)/.test(t)) return 'cena';
+  return null;
+}
+// Cantidad explícita: números, medidas, tamaños. "un/una" solo cuenta para lo que viene por unidad (una empanada).
+const QTY_RE = /\d|(?:^|[\s,])(dos|tres|cuatro|cinco|seis|media|medio|mitad|enter[oa]|porci[oó]n|porciones|plato|platito|taza|tazas|vaso|vasos|copa|unidad|unidades|chic[oa]|grande|median[oa]|poquito|un poco|bastante|gramos|kilo|cucharada|feta|fetas|rodaja|rodajas|pedazo|pedazos|sandwich)(?=[\s,.!]|$)/i;
+const plural = (w, n) => n === 1 || /s$/i.test(w) ? w : (/[aeiouáéó]$/i.test(w) ? w + 's' : w + 'es');
+function buildPortionAsk(text){
+  if(QTY_RE.test(text)) return null;
+  const vm = text.match(INTAKE_RE);
+  const verbWord = vm[2], after = text.slice(vm.index + vm[1].length + verbWord.length);
+  const verb = verbWord.charAt(0).toUpperCase() + verbWord.slice(1).toLowerCase();
+  let food = after.replace(/^[\s,:]+/, '')
+    .replace(/^(un|una|unos|unas|el|la|los|las|algo de|de)\s+/i, '').replace(/[.!…]+$/, '').trim();
+  if(!food || food.length > 60) return null;
+  const many = /,|\s(y|con|más|mas)\s/i.test(food);
+  const f = !many && FOODS.find(([re]) => re.test(food.toLowerCase()));
+  const unit = f ? f[2] : '';
+  const mk = (label, phrase) => ({ label, text: `${verb} ${phrase}` });
+  let question, options;
+  if(many){
+    question = `¿Qué cantidad, más o menos? Así lo anoto bien 🙂`;
+    options = [mk('Poco', `${food}, porciones chicas`), mk('Normal', `${food}, porciones normales`), mk('Bastante', `${food}, porciones grandes`)];
+  }else if(/pizza/i.test(food)){
+    question = '¿Cuánta pizza comiste? 🍕';
+    options = [mk('1 porción', '1 porción de pizza'), mk('2 porciones', '2 porciones de pizza'), mk('3 porciones', '3 porciones de pizza'), mk('Media pizza', 'media pizza'), mk('Pizza entera', 'una pizza entera')];
+  }else if(f && unit === 'unidad'){
+    // "una empanada" ya dice cuánto; sin número ni artículo ("comí empanadas"), pregunto
+    if(/^(un|una|uno)\s/i.test(after.trim())) return null;
+    question = `¿Cuántas ${plural(food.replace(/s$/i, ''), 2)} comiste?`;
+    const w = food.replace(/s$/i, '');
+    options = [1, 2, 3, 4].map(n => mk(n === 4 ? '4 o más' : String(n), `${n} ${plural(w, n)}`));
+  }else if(f && /plato/.test(unit)){
+    question = `¿Qué tamaño de plato de ${food}?`;
+    options = [mk('Plato chico', `un plato chico de ${food}`), mk('Plato normal', `un plato normal de ${food}`), mk('Plato grande', `un plato grande de ${food}`), mk('Repetí', `dos platos de ${food}`)];
+  }else if(f && /taza|vaso|copa/.test(unit)){
+    const u = unit.split(' ')[0];
+    question = `¿Cuántos ${plural(u, 2)}?`;
+    options = [1, 2, 3].map(n => mk(String(n), `${n} ${plural(u, n)} de ${food}`));
+  }else{
+    question = `¿Qué porción de ${food} comiste, más o menos?`;
+    options = [mk('Chica', `una porción chica de ${food}`), mk('Normal', `una porción normal de ${food}`), mk('Grande', `una porción grande de ${food}`)];
+  }
+  return { question, options };
+}
+function answerAsk(m, opt){
+  m.ask.answered = opt.label; save();
+  $('#txt').value = opt.text; updateSend(); send();
 }
 
 /* --- Resúmenes con los números reales del diario --- */
@@ -1204,6 +1270,17 @@ async function send(){
 
   txtEl.value = ''; autosize(); clearPending();
   renderMsg(userMsg, att && att.type === 'img' ? att.dataUrl : null);
+
+  // "Comí una pizza" sin cantidad → la app pregunta la porción antes de anotar (sin llamar al modelo)
+  if(!att && text && isIntake(text)){
+    const ask = buildPortionAsk(text);
+    if(ask){
+      const q = { role:'assistant', content: ask.question, ask, ts: Date.now() + 1 };
+      S.msgs.push(q); save(); renderMsg(q);
+      return;
+    }
+  }
+
   setBusy(true);
   const typingRow = showTyping();
 
@@ -1226,6 +1303,20 @@ async function send(){
     const r = (att && att.type === 'img') ? await answerWithImage(messages, att.dataUrl, ctx, att) : await aiChat(messages, { ctx, att });
     const reply = r.text, engine = r.engine;
     const mem = absorbMemory(reply);
+    // Respaldo: contó que comió algo y el modelo no lo anotó (p. ej. el servicio público ignora las etiquetas)
+    if(text && !att && isIntake(text) && !(mem.logged && mem.logged.length)){
+      try{
+        setStatusText('Anotando en tu diario…');
+        const meal = mealFromText(text) || mealByHour();
+        const items = (await estimateFood(text, null)).map(x => Object.assign(x, { meal }));
+        const logged = logFoods(items);
+        if(logged.length){
+          mem.logged = logged;
+          const kc = Math.round(logged.reduce((a, x) => a + x.kcal, 0));
+          mem.found.push(`${(MEALS.find(m => m.id === meal) || {}).name} (${logged.length} ${logged.length === 1 ? 'ítem' : 'ítems'}, ${kc} kcal)`);
+        }
+      }catch(e){ console.warn('[NutriSalta] Respaldo de registro falló:', e.message); }
+    }
     mem.body = enforceFormat(mem.body);
     // Lo que calcula la app con el diario real (va después del recorte de formato)
     if(text && isSummaryRequest(text)) mem.body = dailySummary() + '\n\n' + mem.body;
@@ -1331,6 +1422,23 @@ const PROVIDER_NAMES = { groq:'Groq', gemini:'Google Gemini', publica:'servicio 
 const geminiKey = () => (lsGet(STORE_KEY + '_gkey') || '').trim();
 const publicEnabled = () => lsGet(STORE_KEY + '_public') !== '0';
 
+function setDiag(id, err){
+  try{
+    const d = JSON.parse(lsGet(STORE_KEY + '_diag') || '{}');
+    d[id] = { ok: !err, msg: err ? String(err).slice(0, 160) : '', ts: Date.now() };
+    lsSet(STORE_KEY + '_diag', JSON.stringify(d));
+  }catch(_){}
+}
+function diagHtml(){
+  let d = {}; try{ d = JSON.parse(lsGet(STORE_KEY + '_diag') || '{}'); }catch(_){}
+  const row = (id, has) => {
+    if(!has) return `<li><b>${PROVIDER_NAMES[id]}:</b> ${id === 'publica' ? 'desactivado' : 'sin clave cargada'}</li>`;
+    const x = d[id];
+    if(!x) return `<li><b>${PROVIDER_NAMES[id]}:</b> todavía sin usar</li>`;
+    return `<li><b>${PROVIDER_NAMES[id]}:</b> ${x.ok ? '✓ respondió' : 'falló'} a las ${fmtTime(x.ts)}${x.ok ? '' : ' · ' + esc(x.msg)}</li>`;
+  };
+  return `<ul class="diag">${row('groq', !!apiKey())}${row('gemini', !!geminiKey())}${row('publica', publicEnabled())}</ul>`;
+}
 function providers(o){
   const list = [];
   if(apiKey())        list.push({ id:'groq',    fn: (m, op) => callGroq(m, op.vision ? VISION_MODEL : MODEL, op) });
@@ -1347,11 +1455,12 @@ async function aiChat(messages, o){
       try{
         if(pv.id !== 'groq') setStatusText('Groq no respondió · probando ' + PROVIDER_NAMES[pv.id] + '…');
         const text = await pv.fn(messages, o);
-        if(text && text.trim()) return { text, engine: pv.id === 'groq' ? 'groq' : pv.id };
+        if(text && text.trim()){ setDiag(pv.id, null); return { text, engine: pv.id === 'groq' ? 'groq' : pv.id }; }
         throw Object.assign(new Error('Respuesta vacía'), { kind:'empty' });
       }catch(e){
         errs.push(e);
         console.warn('[NutriSalta] ' + PROVIDER_NAMES[pv.id] + ' falló (' + (e.status || e.kind || '') + '):', e.message);
+        setDiag(pv.id, e.message);
       }
     }
   }
@@ -1576,6 +1685,9 @@ function renderMsg(m, imgUrl, noScroll){
   }
   const eng = !m.engine ? '' : PROVIDER_NAMES[m.engine] ? ' · vía ' + esc(PROVIDER_NAMES[m.engine]) : ' · sin conexión (' + esc(ENGINE_NAMES[m.engine] || m.engine) + ')';
   inner += `<span class="meta">${fmtTime(m.ts)}${eng}</span>`;
+  if(m.role !== 'user' && m.ask && !m.ask.answered){
+    inner += `<div class="ask-chips">${m.ask.options.map((o, i) => `<button class="chip" data-ask="${i}">${esc(o.label)}</button>`).join('')}<button class="chip ghost" data-ask-other="1">Otra cantidad</button></div>`;
+  }
   if(m.role !== 'user' && m.logged && m.logged.length){
     const kc = Math.round(m.logged.reduce((a, x) => a + x.kcal, 0));
     const meals = [...new Set(m.logged.map(x => (MEALS.find(z => z.id === x.meal) || {}).name))].join(' y ');
@@ -1584,6 +1696,12 @@ function renderMsg(m, imgUrl, noScroll){
     inner += `<div class="bot-actions logged"><span>Se quitó del diario</span></div>`;
   }else if(m.role !== 'user' && imgCache[m.ts]) inner += `<div class="bot-actions"><button class="btn btn-ghost" data-logimg="${m.ts}">Anotar este plato en el diario</button></div>`;
   row.innerHTML = (m.role === 'user' ? '' : '<div class="avatar" aria-hidden="true">NS</div>') + `<div class="bubble">${inner}</div>`;
+  row.querySelectorAll('[data-ask]').forEach(b => b.onclick = () => {
+    if(busy) return;
+    row.querySelector('.ask-chips').remove(); answerAsk(m, m.ask.options[+b.dataset.ask]);
+  });
+  const ao = row.querySelector('[data-ask-other]');
+  if(ao) ao.onclick = () => { m.ask.answered = 'otra'; save(); row.querySelector('.ask-chips').remove(); $('#txt').placeholder = 'Ej: comí 2 porciones y media'; $('#txt').focus(); };
   const ub = row.querySelector('[data-undo]');
   if(ub) ub.onclick = () => { undoLogged(m); const meta = row.querySelector('.bot-actions'); if(meta) meta.innerHTML = '<span>Se quitó del diario</span>'; toast('Listo, lo saqué del diario.'); };
   const lb = row.querySelector('[data-logimg]');
@@ -1857,7 +1975,7 @@ function weekStats(){
   let streak = 0; for(let i = has(0) ? 0 : 1; i < 400 && has(i); i++) streak++;
   return { logged, kcal: logged ? Math.round(kcal/logged) : 0, pain: avg(pain), sleep: avg(sleep), water: water.length ? +(avg(water)/1000).toFixed(1) : null, series, streak };
 }
-function mealByHour(){ const h = new Date().getHours(); return h < 11 ? 'desayuno' : h < 15 ? 'almuerzo' : h < 19 ? 'merienda' : h < 23 ? 'cena' : 'colacion'; }
+function mealByHour(){ const h = new Date().getHours(); return h >= 19 || h < 1 ? 'cena' : h < 5 ? 'colacion' : h < 11 ? 'desayuno' : h < 15 ? 'almuerzo' : 'merienda'; }
 
 const SVG_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
 const SVG_PLUS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
@@ -2449,6 +2567,7 @@ function openModal(){
   try{ $('#m-key').value = localStorage.getItem(STORE_KEY+'_key') || ''; }catch(_){}
   fillModelSelect();
   $('#m-gkey').value = geminiKey(); $('#m-public').checked = publicEnabled();
+  $('#m-diag').innerHTML = diagHtml();
   $('#modal').classList.remove('hidden');
   setTimeout(() => $('#m-name').focus(), 30);
 }
