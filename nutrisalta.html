@@ -656,7 +656,7 @@ const MODEL        = 'llama-3.3-70b-versatile'; // preferido; si Groq lo da de b
 // Si falla, se cae al MODEL de texto con la descripción "[El usuario envió una foto...]".
 const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
 const STORE_KEY    = 'ns_v4';
-const APP_VERSION  = '2.5 · 16 nov 2026'; // subir en cada cambio para verificar que el celular se actualizó
+const APP_VERSION  = '2.6 · 16 nov 2026'; // subir en cada cambio para verificar que el celular se actualizó
 const FORMAT_REMINDER = '(Respondé de vos, como en Salta (probá, sumá, acompañá; nunca "añade" ni "prueba"), en máximo 4 líneas, una sola idea, sin listas ni tablas. Terminá con un 👉 de una sola acción.)';
 const MAX_REPLY_CHARS = 420;
 const MAX_SAVED    = 200;  // msgs guardados de la charla de HOY (los días anteriores se archivan)
@@ -1200,6 +1200,7 @@ async function analyzeStudy(text, fileName){
   const pick = k => (parts.find(x => x[k]) || {})[k];
   const seen = new Set(), values = [];
   parts.forEach(x => x.values.forEach(v => { const k = v.nombre.toLowerCase().replace(/\s+/g, ' '); if(!seen.has(k)){ seen.add(k); values.push(v); } }));
+  addFromRawText(values, text);
   addDerivedValues(values);
   return {
     isStudy: parts.some(x => x.isStudy) && values.length > 0,
@@ -1208,6 +1209,19 @@ async function analyzeStudy(text, fileName){
     summary: (parts.find(x => x.summary) || {}).summary || '',
     weight: pick('weight'), height: pick('height')
   };
+}
+// Red de seguridad: si la IA salteó índices clave, los busco directo en el texto del PDF
+function addFromRawText(values, text){
+  const has = re => values.some(v => re.test(v.nombre));
+  const grab = re => { const m = text.match(re); return m ? m[1].replace(',', '.') : null; };
+  if(!has(/homa/i)){
+    const v = grab(/H\.?\s?O\.?\s?M\.?\s?A\.?(?:\s*[-–]?\s*IR)?[^0-9]{0,60}?(\d{1,2}(?:[.,]\d{1,2})?)(?!\d)/i);
+    if(v && +v > 0 && +v < 30) values.push({ nombre:'HOMA-IR', valor:v, unidad:'', referencia:'menor a 2,5', estado: +v < 2.5 ? 'normal' : 'alto' });
+  }
+  if(!has(/insulin/i)){
+    const v = grab(/insulin[ae]?(?:\s+(?:basal|en ayunas|plasm[aá]tica))?[^0-9]{0,40}?(\d{1,3}(?:[.,]\d{1,2})?)(?!\d)/i);
+    if(v && +v > 0 && +v < 300) values.push({ nombre:'Insulina basal', valor:v, unidad:'µUI/ml', referencia:'2-25', estado: +v > 25 ? 'alto' : +v < 2 ? 'bajo' : 'normal' });
+  }
 }
 // Índices que se pueden calcular si el laboratorio no los informó
 function addDerivedValues(values){
