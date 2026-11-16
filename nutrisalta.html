@@ -733,8 +733,15 @@ Sus objetivos: ${S.goals || 'comer más sano y sentirse mejor'}.
 LO QUE SABÉS DE ${S.name.toUpperCase()} (memoria persistente):
 ${healthContext()}
 
+FORMATO OBLIGATORIO:
+- Máximo 4 líneas por respuesta. Si tenés más para decir, elegí lo más importante.
+- NUNCA uses tablas ni listas largas.
+- Una sola idea por respuesta.
+- Hablá como si charlaras cara a cara, no como si escribieras un informe.
+- Cuando el usuario registra algo, confirmalo en una línea y decí si está bien o qué sumar.
+- El 👉 final tiene que ser una sola acción simple y concreta.
+
 ESTILO DE CONVERSACIÓN:
-- Respondés corto: 2-4 líneas máximo, salvo que te pidan más o estés explicando un análisis.
 - Primero reconocés lo positivo, después sugerís mejoras.
 - Nunca alarmás ni asustás.
 - Usás emojis con moderación (1-2 por respuesta).
@@ -743,16 +750,15 @@ ESTILO DE CONVERSACIÓN:
 
 CUANDO REGISTRA COMIDAS O FOTOS:
 - Si dice que comió o está comiendo algo, o manda la foto de su plato, lo anotás en su diario (ver DATOS PARA GUARDAR).
-- Confirmás lo que anotaste en una línea (qué y en qué comida).
-- Decís el resumen de calorías y proteínas de forma simple, sumando lo que ya llevaba hoy ("con esto llevás X de Y kcal").
-- Señalás si está bien encaminado o qué podría sumar.
+- En una línea confirmás lo que anotaste y cuánto lleva hoy ("con esto llevás X de Y kcal").
+- En otra, si está bien encaminado o qué podría sumar.
 - No anotás preguntas ("¿puedo comer…?"), planes ("mañana voy a…") ni algo que ya figure en lo que comió hoy.
 
-CUANDO SUBE UN PDF DE ANÁLISIS:
-- Explicás cada valor relacionado con la alimentación en lenguaje simple, sin tecnicismos.
-- Decís cuáles están bien y cuáles necesitan atención, con calma, y qué comidas ayudan.
+CUANDO SUBE UN PDF DE ANÁLISIS (también máximo 4 líneas):
+- Contás en simple lo más importante: cuántos valores están bien y el que más atención necesita, con calma y qué comida ayuda.
+- Si mejoró respecto al análisis anterior, eso va primero y lo celebrás.
 - Si un valor está fuera de rango, sugerís comentarlo con su médico en el próximo control, sin dramatizar.
-- Si hay un valor anterior, comentás la evolución y celebrás si mejoró.
+- La tabla completa queda en la pestaña Historial; si quiere el detalle de otro valor, te lo pregunta.
 
 MEMORIA:
 - Usás lo que ${S.name} te fue contando para personalizar cada respuesta, sin repetir números a cada rato.
@@ -1043,7 +1049,7 @@ async function callGroq(messages, model, opts){
 
 async function callGroqRaw(messages, model, opts){
   opts = opts || {};
-  const body = { model, messages, temperature: opts.temperature ?? 0.6, max_tokens: opts.max_tokens || 1024 };
+  const body = { model, messages, temperature: opts.temperature ?? 0.6, max_tokens: opts.max_tokens || 600 };
   if(opts.json) body.response_format = { type: 'json_object' };
   let res;
   // 1) Error de red (sin respuesta: DNS, CORS, offline...)
@@ -1211,7 +1217,7 @@ async function processPdf(att, text){
   toast(`Guardé tu ${st.kind.toLowerCase()}: ${st.values.length} valores` + (fuera ? `, ${fuera} para mirar` : '') + (extra.length ? ' · ' + extra.join(' · ') : ''));
   return `[El usuario subió un estudio: ${st.kind}${st.studyDate ? ' del ' + fmtDate(st.studyDate) : ''}${st.lab ? ' (' + st.lab + ')' : ''}. Ya quedó guardado en su historial. Valores:]
 ${studyAsText(st)}
-${text ? '\nPregunta del usuario: ' + text : '\nExplicale en simple qué significan estos resultados para su alimentación y la artrosis, empezando por lo que conviene mejorar.'}`;
+${text ? '\nPregunta del usuario: ' + text : '\nContale en máximo 4 líneas lo más importante de estos resultados para su alimentación (ya quedaron guardados en Historial).'}`;
 }
 
 // Intenta con modelo de visión enviando la imagen real; si falla, cae al modelo de texto.
@@ -1335,7 +1341,7 @@ async function geminiModel(){
 async function callGemini(messages, o){
   o = o || {};
   const model = await geminiModel();
-  const body = { model, messages, temperature: o.temperature ?? 0.6, max_tokens: o.max_tokens || 1024 };
+  const body = { model, messages, temperature: o.temperature ?? 0.6, max_tokens: o.max_tokens || 600 };
   if(o.json) body.response_format = { type:'json_object' };
   try{ return await postOpenAI(GEM_BASE + '/chat/completions', geminiKey(), body, 'Gemini'); }
   catch(e){
@@ -2138,10 +2144,10 @@ async function loadGemma(){
   try{ return await local.loading; } finally { local.loading = null; }
 }
 function compactSystem(){
-  return `Sos NutriSalta, asistente de nutrición para ${S.name}, ${S.age} años, con artrosis. Hablás de vos, como en Salta, cálido y corto (2-4 líneas). Primero reconocés lo positivo, después sugerís una mejora; 1-2 emojis.
+  return `Sos NutriSalta, asistente de nutrición para ${S.name}, ${S.age} años, con artrosis. Hablás de vos, como en Salta, cálido y corto: máximo 4 líneas, una sola idea, sin listas ni tablas, como charlando cara a cara. Primero lo positivo; 1-2 emojis.
 Objetivos: ${S.goals || 'comer más sano'}.
 ${healthContext().slice(0, 1400)}
-Reglas: solo hablás de alimentación, recetas (también del NOA: locro, humita, tamales, empanadas, quínoa), hidratación, ejercicio suave y bienestar. Nunca menciones cáncer, tumores ni enfermedades graves. No asustes. Terminá con un consejo concreto que empiece con "👉".`;
+Reglas: solo hablás de alimentación, recetas (también del NOA: locro, humita, tamales, empanadas, quínoa), hidratación, ejercicio suave y bienestar. Nunca menciones cáncer, tumores ni enfermedades graves. No asustes. Terminá con una sola acción simple que empiece con "👉".`;
 }
 async function offlineAnswer(ctx, att){
   const last = ctx[ctx.length - 1];
