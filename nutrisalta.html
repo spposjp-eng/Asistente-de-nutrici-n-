@@ -1,0 +1,1858 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#7a1f2b">
+<title>NutriSalta</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+/* =========================================================
+   SEMILLA DE DISEÑO
+   Todo el sistema de color se deriva de dos tonos semilla:
+   --seed-h  : rojo poncho salteño (marca, acciones)
+   --seed2-h : verde cardón (estados positivos, nutrición)
+   Cambiando estos dos números se re-tematiza la app entera.
+   ========================================================= */
+:root{
+  --seed-h: 352;
+  --seed-s: 58%;
+  --seed2-h: 150;
+  --neutral-h: 30;
+
+  /* Marca */
+  --brand:        hsl(var(--seed-h) var(--seed-s) 30%);
+  --brand-hover:  hsl(var(--seed-h) var(--seed-s) 24%);
+  --brand-soft:   hsl(var(--seed-h) 45% 95%);
+  --brand-line:   hsl(var(--seed-h) 35% 86%);
+  --on-brand:     #fff;
+
+  /* Acento cardón */
+  --ok:           hsl(var(--seed2-h) 32% 32%);
+  --ok-soft:      hsl(var(--seed2-h) 28% 94%);
+  --warn:         hsl(34 70% 34%);
+  --warn-soft:    hsl(38 80% 92%);
+
+  /* Neutros (levemente cálidos, tono adobe) */
+  --bg:           hsl(var(--neutral-h) 14% 97%);
+  --surface:      #ffffff;
+  --surface-2:    hsl(var(--neutral-h) 12% 94.5%);
+  --line:         hsl(var(--neutral-h) 10% 87%);
+  --text:         hsl(var(--neutral-h) 12% 13%);
+  --text-2:       hsl(var(--neutral-h) 7% 38%);
+  --text-3:       hsl(var(--neutral-h) 6% 55%);
+  --danger:       hsl(8 70% 42%);
+
+  /* Tipo: stack de sistema, sin fuentes "de IA" */
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --fs-xs: 12px; --fs-sm: 13.5px; --fs-md: 15px; --fs-lg: 18px; --fs-xl: 22px;
+
+  --r-sm: 8px; --r-md: 12px; --r-lg: 18px;
+  --shadow: 0 1px 2px hsl(var(--neutral-h) 20% 20% / .06), 0 4px 16px hsl(var(--neutral-h) 20% 20% / .06);
+  --maxw: 760px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --brand:        hsl(var(--seed-h) 55% 62%);
+    --brand-hover:  hsl(var(--seed-h) 60% 70%);
+    --brand-soft:   hsl(var(--seed-h) 25% 18%);
+    --brand-line:   hsl(var(--seed-h) 20% 28%);
+    --on-brand:     hsl(var(--seed-h) 40% 10%);
+    --ok:           hsl(var(--seed2-h) 35% 62%);
+    --ok-soft:      hsl(var(--seed2-h) 20% 16%);
+    --warn:         hsl(38 75% 65%);
+    --warn-soft:    hsl(36 35% 17%);
+    --bg:           hsl(var(--neutral-h) 8% 9%);
+    --surface:      hsl(var(--neutral-h) 7% 12.5%);
+    --surface-2:    hsl(var(--neutral-h) 6% 16%);
+    --line:         hsl(var(--neutral-h) 6% 22%);
+    --text:         hsl(var(--neutral-h) 10% 92%);
+    --text-2:       hsl(var(--neutral-h) 6% 70%);
+    --text-3:       hsl(var(--neutral-h) 5% 52%);
+    --danger:       hsl(8 70% 64%);
+  }
+}
+
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font:var(--fs-md)/1.5 var(--font);-webkit-font-smoothing:antialiased}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:6px}
+.hidden{display:none !important}
+svg{display:block}
+
+/* Firma: guarda del poncho salteño (rojo + franjas negras) */
+.guarda{height:6px;background:
+  linear-gradient(to bottom,
+    var(--brand) 0 2px, #111 2px 3px, var(--brand) 3px 4px, #111 4px 5px, var(--brand) 5px 6px);}
+
+/* ---------- Botones ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid transparent;
+  border-radius:var(--r-sm);padding:10px 16px;font-size:var(--fs-sm);font-weight:600;transition:background .15s,border-color .15s}
+.btn-primary{background:var(--brand);color:var(--on-brand)}
+.btn-primary:hover{background:var(--brand-hover)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.btn-ghost{background:transparent;border-color:var(--line);color:var(--text)}
+.btn-ghost:hover{background:var(--surface-2)}
+.btn-danger{background:transparent;border-color:var(--line);color:var(--danger)}
+.icon-btn{width:40px;height:40px;display:grid;place-items:center;border:0;background:transparent;border-radius:10px;color:var(--text-2)}
+.icon-btn:hover{background:var(--surface-2);color:var(--text)}
+.icon-btn svg{width:20px;height:20px}
+
+/* ---------- Form ---------- */
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.field label{font-size:var(--fs-sm);font-weight:600;color:var(--text-2)}
+.field input,.field textarea{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 12px;outline:none;resize:vertical}
+.field input:focus,.field textarea:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.hint{font-size:var(--fs-xs);color:var(--text-3)}
+
+/* ---------- Setup ---------- */
+#setup{min-height:100%;display:flex;flex-direction:column}
+.setup-wrap{flex:1;display:grid;place-items:center;padding:24px 16px}
+.setup-card{width:100%;max-width:420px}
+.setup-brand{display:flex;align-items:center;gap:10px;margin-bottom:28px}
+.logo{width:36px;height:36px;border-radius:10px;background:var(--brand);color:var(--on-brand);display:grid;place-items:center;font-weight:800;letter-spacing:-.5px}
+.setup-card h1{font-size:26px;line-height:1.2;margin:0 0 8px;letter-spacing:-.4px}
+.setup-card p.lead{color:var(--text-2);margin:0 0 24px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 11px;font-size:var(--fs-xs);color:var(--text-2)}
+.chip:hover{border-color:var(--brand);color:var(--brand)}
+.chip.on{background:var(--brand-soft);border-color:var(--brand-line);color:var(--brand)}
+
+/* ---------- App shell ---------- */
+#app{height:100%;display:flex;flex-direction:column}
+.topbar{background:var(--surface);border-bottom:1px solid var(--line)}
+.topbar-in{max-width:var(--maxw);margin:0 auto;display:flex;align-items:center;gap:12px;padding:10px 16px}
+.topbar .who{flex:1;min-width:0}
+.topbar .who b{display:block;font-size:var(--fs-md)}
+.topbar .who span{display:block;font-size:var(--fs-xs);color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);margin-right:5px;vertical-align:1px}
+.status-dot.err{background:var(--danger)}
+
+.tabs{max-width:var(--maxw);margin:0 auto;display:flex;padding:0 8px}
+.tab{flex:1;background:none;border:0;padding:10px 4px 12px;font-size:var(--fs-sm);font-weight:600;color:var(--text-3);border-bottom:2px solid transparent}
+.tab[aria-selected="true"]{color:var(--brand);border-bottom-color:var(--brand)}
+.tab:hover{color:var(--text)}
+
+main{flex:1;overflow:hidden;position:relative}
+.panel{position:absolute;inset:0;overflow-y:auto}
+.panel-in{max-width:var(--maxw);margin:0 auto;padding:20px 16px 32px}
+
+/* ---------- Chat ---------- */
+#chat-panel{display:flex;flex-direction:column}
+#msgs{flex:1;overflow-y:auto;scroll-behavior:smooth}
+#msgs .panel-in{display:flex;flex-direction:column;gap:14px}
+.row{display:flex;gap:10px;align-items:flex-end;max-width:100%}
+.row.user{justify-content:flex-end}
+.avatar{flex:none;width:28px;height:28px;border-radius:8px;background:var(--brand);color:var(--on-brand);display:grid;place-items:center;font-size:11px;font-weight:800}
+.bubble{max-width:min(82%,560px);padding:10px 14px;border-radius:var(--r-lg);word-wrap:break-word;overflow-wrap:anywhere}
+.row.bot .bubble{background:var(--surface);border:1px solid var(--line);border-bottom-left-radius:6px}
+.row.user .bubble{background:var(--brand);color:var(--on-brand);border-bottom-right-radius:6px}
+.row.error .bubble{background:transparent;border:1px dashed var(--danger);color:var(--danger);font-size:var(--fs-sm)}
+.bubble p{margin:0 0 8px}.bubble p:last-child{margin-bottom:0}
+.bubble ul,.bubble ol{margin:4px 0 8px;padding-left:20px}
+.bubble li{margin:2px 0}
+.bubble h4{margin:10px 0 4px;font-size:var(--fs-md)}
+.bubble strong{font-weight:650}
+.bubble .meta{display:block;margin-top:6px;font-size:11px;opacity:.65;font-family:var(--mono)}
+.att-tag{display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-xs);padding:3px 8px;border-radius:6px;background:hsl(0 0% 100% / .18);margin-bottom:6px}
+.att-tag svg{width:13px;height:13px}
+.bubble img.thumb{display:block;max-width:220px;max-height:220px;border-radius:10px;margin-bottom:6px;object-fit:cover}
+
+.typing{display:inline-flex;gap:4px;padding:4px 2px}
+.typing i{width:7px;height:7px;border-radius:50%;background:var(--text-3);animation:blink 1.2s infinite both}
+.typing i:nth-child(2){animation-delay:.18s}.typing i:nth-child(3){animation-delay:.36s}
+@keyframes blink{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
+
+.empty{text-align:center;padding:36px 8px 8px;color:var(--text-2)}
+.empty h2{font-size:var(--fs-xl);color:var(--text);margin:0 0 6px;letter-spacing:-.3px}
+.empty p{margin:0 auto 20px;max-width:420px;font-size:var(--fs-sm)}
+.starters{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;text-align:left}
+.starter{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:12px 14px;font-size:var(--fs-sm);color:var(--text)}
+.starter:hover{border-color:var(--brand-line);background:var(--brand-soft)}
+.starter small{display:block;color:var(--text-3);font-size:var(--fs-xs);margin-bottom:2px}
+
+/* ---------- Composer ---------- */
+.composer{background:var(--surface);border-top:1px solid var(--line);padding:8px 0 calc(8px + env(safe-area-inset-bottom))}
+.composer-in{max-width:var(--maxw);margin:0 auto;padding:0 12px}
+.preview{display:flex;align-items:center;gap:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-md);padding:8px 8px 8px 10px;margin-bottom:8px}
+.preview img{width:44px;height:44px;border-radius:8px;object-fit:cover}
+.preview .pdf-ico{width:44px;height:44px;border-radius:8px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;font-size:11px;font-weight:800;font-family:var(--mono)}
+.preview .info{flex:1;min-width:0;font-size:var(--fs-sm)}
+.preview .info b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.preview .info span{color:var(--text-3);font-size:var(--fs-xs)}
+.input-row{display:flex;align-items:flex-end;gap:4px}
+#txt{flex:1;resize:none;border:1px solid var(--line);background:var(--bg);border-radius:20px;padding:9px 14px;max-height:140px;min-height:40px;line-height:1.4;outline:none}
+#txt:focus{border-color:var(--brand)}
+#send{width:40px;height:40px;border-radius:50%;border:0;background:var(--brand);color:var(--on-brand);display:grid;place-items:center;flex:none}
+#send:disabled{opacity:.4;cursor:not-allowed}
+#send svg{width:18px;height:18px}
+
+/* ---------- Perfil / Historial ---------- */
+.sec-title{font-size:var(--fs-xs);font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);margin:24px 0 10px}
+.sec-title:first-child{margin-top:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md)}
+.kv{display:flex;justify-content:space-between;gap:16px;padding:12px 16px;border-top:1px solid var(--line);font-size:var(--fs-sm)}
+.kv:first-child{border-top:0}
+.kv dt{color:var(--text-2)}
+.kv dd{margin:0;text-align:right;font-weight:550;max-width:65%;overflow-wrap:anywhere}
+.badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:var(--fs-xs);font-weight:600;background:var(--ok-soft);color:var(--ok)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:12px 14px}
+.stat b{display:block;font-size:var(--fs-xl);font-family:var(--mono);font-weight:600;letter-spacing:-.5px}
+.stat span{font-size:var(--fs-xs);color:var(--text-3)}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+
+.timeline{list-style:none;margin:0;padding:0}
+.timeline li{display:flex;gap:12px;padding:14px 16px;border-top:1px solid var(--line)}
+.timeline li:first-child{border-top:0}
+.timeline .ico{flex:none;width:36px;height:36px;border-radius:8px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;font-family:var(--mono);font-size:10px;font-weight:800}
+.timeline .body{flex:1;min-width:0}
+.timeline .body b{display:block;font-size:var(--fs-sm);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.timeline .body span{font-size:var(--fs-xs);color:var(--text-3)}
+.timeline .body p{margin:6px 0 0;font-size:var(--fs-sm);color:var(--text-2)}
+.blank{padding:28px 16px;text-align:center;color:var(--text-2);font-size:var(--fs-sm)}
+.blank b{display:block;color:var(--text);margin-bottom:4px;font-size:var(--fs-md)}
+
+.delta{font-family:var(--mono);font-size:var(--fs-xs);color:var(--text-3);font-weight:500;margin-left:4px}
+.study-list{display:flex;flex-direction:column;gap:10px}
+.study-head{display:flex;gap:12px;align-items:flex-start;padding:14px 8px 0 16px}
+.study-head .ico{flex:none;width:36px;height:36px;border-radius:8px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;font-family:var(--mono);font-size:10px;font-weight:800}
+.study-head .body{flex:1;min-width:0}
+.study-head .body b{display:block;font-size:var(--fs-md)}
+.study-head .body span{display:block;font-size:var(--fs-xs);color:var(--text-3)}
+.study-head .body .file{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.study-sum{margin:10px 16px 0;font-size:var(--fs-sm);color:var(--text-2)}
+.vals{margin:10px 0 0;border-top:1px solid var(--line)}
+.vals summary{padding:11px 16px;cursor:pointer;font-size:var(--fs-sm);font-weight:600;list-style-position:inside}
+.vals[open] summary{border-bottom:1px solid var(--line)}
+.study > :last-child:not(.vals){margin-bottom:14px}
+.vtable{width:100%;border-collapse:collapse;font-size:var(--fs-sm)}
+.vtable td{padding:8px 16px;border-top:1px solid var(--line);vertical-align:middle}
+.vtable tr:first-child td{border-top:0}
+.vtable td:first-child{padding-right:6px}
+.vtable .num{font-family:var(--mono);white-space:nowrap;text-align:right}
+.vtable .num small{color:var(--text-3);font-family:var(--font)}
+.vtable .ref{color:var(--text-3);font-size:var(--fs-xs);white-space:nowrap}
+.vtable td:last-child{text-align:right;padding-left:4px}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:600;white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:520px){ .vtable .ref{display:none} }
+
+/* ---------- Hoy ---------- */
+.daynav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.daynav b{font-size:var(--fs-lg);letter-spacing:-.2px}
+.daynav span{display:block;font-size:var(--fs-xs);color:var(--text-3);font-weight:400}
+.daynav .mid{text-align:center}
+.icon-btn:disabled{opacity:.3;cursor:default;background:none}
+.energy{display:grid;grid-template-columns:132px 1fr;gap:18px;align-items:center;padding:16px}
+.ring{position:relative;width:132px;height:132px}
+.ring svg{width:132px;height:132px;transform:rotate(-90deg)}
+.ring .track{stroke:var(--surface-2)}
+.ring .val{stroke:var(--brand);transition:stroke-dashoffset .5s ease}
+.ring .center{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
+.ring .center b{font-family:var(--mono);font-size:24px;font-weight:600;letter-spacing:-1px;line-height:1.1}
+.ring .center span{font-size:11px;line-height:1.25;color:var(--text-3);max-width:76px;margin:2px auto 0}
+.meters{display:flex;flex-direction:column;gap:12px}
+.meter .lbl{display:flex;justify-content:space-between;font-size:var(--fs-xs);color:var(--text-2);margin-bottom:5px}
+.meter .lbl b{color:var(--text);font-weight:600}
+.meter .lbl em{font-style:normal;font-family:var(--mono)}
+.meter .bar{height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden}
+.meter .bar i{display:block;height:100%;border-radius:4px;background:var(--brand);transition:width .5s ease}
+.goal-note{border-top:1px solid var(--line);padding:10px 16px;font-size:var(--fs-xs);color:var(--text-3)}
+.goal-note button{color:var(--brand);font-weight:600}
+.link{background:none;border:0;padding:0;color:var(--brand);font-weight:600;font-size:inherit}
+.water{padding:14px 16px}
+.water .head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
+.water .head b{font-size:var(--fs-sm)}
+.water .head span{font-family:var(--mono);font-size:var(--fs-sm);color:var(--text-2)}
+.glasses{display:grid;grid-template-columns:repeat(var(--n),minmax(0,34px));gap:6px}
+.glass{width:100%;aspect-ratio:34/42;border:1.5px solid var(--line);border-radius:4px 4px 9px 9px;background:transparent;padding:0;position:relative;overflow:hidden}
+.glass::after{content:"";position:absolute;left:0;right:0;bottom:0;height:0;background:hsl(205 70% 55% / .75);transition:height .25s}
+.glass.on{border-color:hsl(205 55% 55%)}
+.glass.on::after{height:78%}
+.glass:hover{border-color:hsl(205 55% 55%)}
+.feel{padding:14px 16px;display:flex;flex-direction:column;gap:14px}
+.feel .q{font-size:var(--fs-sm);font-weight:600;margin-bottom:8px;display:flex;justify-content:space-between}
+.feel .q span{font-weight:400;color:var(--text-3);font-size:var(--fs-xs)}
+.scale{display:grid;grid-template-columns:repeat(11,1fr);gap:3px}
+.scale button{height:34px;border:1px solid var(--line);background:var(--surface);border-radius:6px;font-family:var(--mono);font-size:var(--fs-xs);padding:0}
+.scale button.on{background:var(--brand);border-color:var(--brand);color:var(--on-brand)}
+.scale-ends{display:flex;justify-content:space-between;font-size:11px;color:var(--text-3);margin-top:4px}
+.seg{display:flex;gap:4px;background:var(--surface-2);padding:3px;border-radius:10px;flex-wrap:wrap}
+.seg button{flex:1;border:0;background:transparent;border-radius:8px;padding:7px 4px;font-size:var(--fs-xs);font-weight:600;color:var(--text-2);white-space:nowrap}
+.seg button.on{background:var(--surface);color:var(--text);box-shadow:0 1px 2px hsl(0 0% 0% / .12)}
+.stepper{display:flex;align-items:center;gap:6px}
+.stepper button{width:34px;height:34px;border:1px solid var(--line);background:var(--surface);border-radius:8px;font-size:18px;line-height:1}
+.stepper b{min-width:64px;text-align:center;font-family:var(--mono);font-weight:600}
+.meal{border-top:1px solid var(--line)}
+.meal:first-child{border-top:0}
+.meal-h{display:flex;align-items:center;gap:8px;padding:10px 8px 10px 16px}
+.meal-h b{flex:1;font-size:var(--fs-sm)}
+.meal-h span{font-family:var(--mono);font-size:var(--fs-xs);color:var(--text-3)}
+.meal ul{list-style:none;margin:0;padding:0 0 6px}
+.meal li{display:flex;align-items:center;gap:8px;padding:4px 8px 4px 16px;font-size:var(--fs-sm)}
+.meal li .n{flex:1;min-width:0}
+.meal li .n small{display:block;color:var(--text-3);font-size:var(--fs-xs)}
+.meal li .k{font-family:var(--mono);font-size:var(--fs-xs);color:var(--text-2);white-space:nowrap}
+.meal li .icon-btn{width:30px;height:30px}
+.meal li .icon-btn svg{width:15px;height:15px}
+.add-food{width:100%;margin-top:10px}
+.chart{padding:14px 16px 10px;position:relative}
+.chart svg{width:100%;height:auto;overflow:visible}
+.chart .axis{font-size:10px;fill:var(--text-3);font-family:var(--font)}
+.chart .gl{stroke:var(--line);stroke-width:1}
+.chart .goal{stroke:var(--text-3);stroke-width:1;stroke-dasharray:4 3}
+.chart .b{fill:var(--brand)}
+.chart .b.today{fill:var(--brand-hover)}
+.chart .hit{fill:transparent;cursor:default}
+.chart .hit:hover + .b, .chart .hit:focus + .b{opacity:.75}
+.chart .ln{fill:none;stroke:var(--brand);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.chart .dot{fill:var(--brand);stroke:var(--surface);stroke-width:2}
+.chart-cap{font-size:var(--fs-xs);color:var(--text-3);padding:0 16px 12px}
+.tip{position:fixed;z-index:70;background:var(--text);color:var(--bg);font-size:var(--fs-xs);padding:6px 9px;border-radius:7px;pointer-events:none;transform:translate(-50%,-100%);margin-top:-8px;white-space:nowrap}
+.mini-stats{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line)}
+.mini-stats div{padding:10px 12px;border-left:1px solid var(--line)}
+.mini-stats div:first-child{border-left:0}
+.mini-stats b{display:block;font-family:var(--mono);font-size:var(--fs-md)}
+.mini-stats span{font-size:11px;color:var(--text-3)}
+.f-input{position:relative}
+.f-input textarea{width:100%;padding-right:46px}
+.f-input .icon-btn{position:absolute;right:4px;top:4px}
+.f-photo{display:flex;align-items:center;gap:10px;margin-top:8px}
+.f-photo img{width:56px;height:56px;border-radius:8px;object-fit:cover}
+.f-rec{margin-top:14px}
+.f-rec .hint{display:block;margin-bottom:6px}
+.f-list{margin-top:14px;border:1px solid var(--line);border-radius:var(--r-md)}
+.f-row{display:flex;gap:8px;align-items:center;padding:8px 6px 8px 12px;border-top:1px solid var(--line);font-size:var(--fs-sm)}
+.f-row:first-child{border-top:0}
+.f-row .n{flex:1;min-width:0}
+.f-row .n small{display:block;color:var(--text-3);font-size:var(--fs-xs)}
+.f-row .k{font-family:var(--mono);font-size:var(--fs-xs);white-space:nowrap;text-align:right}
+.f-total{display:flex;justify-content:space-between;padding:10px 12px;background:var(--surface-2);border-top:1px solid var(--line);font-size:var(--fs-sm);font-weight:600;border-radius:0 0 var(--r-md) var(--r-md)}
+.f-total span{font-family:var(--mono)}
+.f-manual{display:grid;grid-template-columns:1fr 84px auto;gap:6px;margin-top:10px}
+.f-manual input{border:1px solid var(--line);background:var(--surface);border-radius:var(--r-sm);padding:8px 10px;min-width:0}
+.field select{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 12px}
+.bot-actions{margin-top:8px}
+.bot-actions .btn{padding:6px 12px;font-size:var(--fs-xs)}
+.tabs .tab{font-size:var(--fs-sm)}
+@media (max-width:420px){ .energy{grid-template-columns:112px 1fr;gap:14px} .ring,.ring svg{width:112px;height:112px} .ring .center b{font-size:20px} }
+
+/* ---------- Modal ---------- */
+.overlay{position:fixed;inset:0;background:hsl(0 0% 0% / .4);display:grid;place-items:center;padding:16px;z-index:50}
+.modal{width:100%;max-width:440px;background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--shadow);max-height:90vh;overflow:auto}
+.modal header{display:flex;align-items:center;justify-content:space-between;padding:14px 12px 6px 20px}
+.modal header h3{margin:0;font-size:var(--fs-lg)}
+.modal .m-body{padding:8px 20px 4px}
+.modal footer{display:flex;justify-content:flex-end;gap:8px;padding:8px 20px 18px}
+details.adv{margin:4px 0 12px;font-size:var(--fs-sm)}
+details.adv summary{cursor:pointer;color:var(--text-2)}
+details.adv .field{margin-top:10px}
+
+/* ---------- Toast ---------- */
+#toast{position:fixed;left:50%;bottom:96px;transform:translate(-50%,20px);background:var(--text);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:var(--fs-sm);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:60;max-width:calc(100% - 32px);text-align:center}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+#toast.err{background:var(--danger);color:#fff}
+
+@media (max-width:520px){
+  .bubble{max-width:88%}
+  .stats{grid-template-columns:repeat(3,1fr)}
+  .stat b{font-size:var(--fs-lg)}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none !important;transition:none !important;scroll-behavior:auto !important}
+}
+</style>
+</head>
+<body>
+
+<!-- ================= SETUP ================= -->
+<section id="setup" class="hidden" aria-labelledby="setup-title">
+  <div class="guarda"></div>
+  <div class="setup-wrap">
+    <form class="setup-card" id="setup-form" novalidate>
+      <div class="setup-brand"><div class="logo">NS</div><b>NutriSalta</b></div>
+      <h1 id="setup-title">Comamos rico y cuidemos las articulaciones.</h1>
+      <p class="lead">Contame un poco de vos para que las recomendaciones sean tuyas.</p>
+      <div class="field">
+        <label for="s-name">¿Cómo te llamás?</label>
+        <input id="s-name" autocomplete="given-name" required maxlength="40" placeholder="Ej: Rosa">
+      </div>
+      <div class="field">
+        <label for="s-age">Edad</label>
+        <input id="s-age" type="number" inputmode="numeric" min="1" max="120" required placeholder="Ej: 64">
+      </div>
+      <div class="field">
+        <label for="s-goals">¿Qué querés lograr?</label>
+        <textarea id="s-goals" rows="3" maxlength="400" placeholder="Ej: bajar de peso, desinflamar las rodillas, comer más verdura"></textarea>
+        <div class="chips" id="goal-chips">
+          <button type="button" class="chip">Desinflamar articulaciones</button>
+          <button type="button" class="chip">Bajar de peso</button>
+          <button type="button" class="chip">Comer más sano</button>
+          <button type="button" class="chip">Cuidar el azúcar</button>
+          <button type="button" class="chip">Tener más energía</button>
+        </div>
+      </div>
+      <div class="field hidden" id="s-key-wrap">
+        <label for="s-key">Clave de Groq</label>
+        <input id="s-key" type="password" autocomplete="off" placeholder="gsk_…">
+        <span class="hint">Se guarda solo en este navegador.</span>
+      </div>
+      <button class="btn btn-primary" style="width:100%;margin-top:8px" type="submit">Empezar</button>
+    </form>
+  </div>
+</section>
+
+<!-- ================= APP ================= -->
+<div id="app" class="hidden">
+  <header class="topbar">
+    <div class="guarda"></div>
+    <div class="topbar-in">
+      <div class="logo">NS</div>
+      <div class="who">
+        <b>NutriSalta</b>
+        <span id="status"><i class="status-dot"></i>Listo para ayudarte</span>
+      </div>
+      <button class="icon-btn" id="btn-settings" aria-label="Editar mis datos" title="Editar mis datos">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </button>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab" role="tab" data-tab="chat" aria-selected="true">Chat</button>
+      <button class="tab" role="tab" data-tab="hoy" aria-selected="false">Hoy</button>
+      <button class="tab" role="tab" data-tab="historial" aria-selected="false">Historial</button>
+      <button class="tab" role="tab" data-tab="perfil" aria-selected="false">Perfil</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Chat -->
+    <section class="panel" id="chat-panel" role="tabpanel">
+      <div id="msgs"><div class="panel-in" id="msg-list"></div></div>
+      <div class="composer">
+        <div class="composer-in">
+          <div class="preview hidden" id="preview">
+            <img id="pv-img" alt="" class="hidden">
+            <div class="pdf-ico hidden" id="pv-pdf">PDF</div>
+            <div class="info"><b id="pv-name"></b><span id="pv-meta"></span></div>
+            <button class="icon-btn" id="pv-remove" aria-label="Quitar adjunto" title="Quitar adjunto">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <div class="input-row">
+            <button class="icon-btn" id="btn-cam" aria-label="Sacar o subir foto de comida" title="Foto de comida">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            </button>
+            <button class="icon-btn" id="btn-pdf" aria-label="Subir análisis en PDF" title="Análisis de sangre (PDF)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 15h6M9 11h2"/></svg>
+            </button>
+            <input type="file" id="f-img" accept="image/*" capture="environment" class="hidden">
+            <input type="file" id="f-pdf" accept="application/pdf,.pdf" class="hidden">
+            <textarea id="txt" rows="1" placeholder="Preguntame lo que quieras sobre comida…" aria-label="Mensaje"></textarea>
+            <button id="send" aria-label="Enviar" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Perfil -->
+    <section class="panel hidden" id="hoy-panel" role="tabpanel">
+      <div class="panel-in" id="hoy-body"></div>
+    </section>
+
+    <section class="panel hidden" id="perfil-panel" role="tabpanel">
+      <div class="panel-in" id="perfil-body"></div>
+    </section>
+
+    <!-- Historial -->
+    <section class="panel hidden" id="historial-panel" role="tabpanel">
+      <div class="panel-in" id="historial-body"></div>
+    </section>
+  </main>
+</div>
+
+<!-- ================= MODAL CONFIG ================= -->
+<div class="overlay hidden" id="modal" role="dialog" aria-modal="true" aria-labelledby="m-title">
+  <form class="modal" id="m-form" novalidate>
+    <header>
+      <h3 id="m-title">Mis datos</h3>
+      <button type="button" class="icon-btn" id="m-close" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </header>
+    <div class="m-body">
+      <div class="field"><label for="m-name">Nombre</label><input id="m-name" maxlength="40" required></div>
+      <div class="field"><label for="m-age">Edad</label><input id="m-age" type="number" min="1" max="120" required></div>
+      <div class="field"><label for="m-goals">Objetivos</label><textarea id="m-goals" rows="3" maxlength="400"></textarea></div>
+      <div class="two">
+        <div class="field"><label for="m-weight">Peso (kg)</label><input id="m-weight" type="number" inputmode="decimal" step="0.1" min="25" max="300" placeholder="Ej: 72.5"></div>
+        <div class="field"><label for="m-height">Altura (cm)</label><input id="m-height" type="number" inputmode="numeric" min="100" max="230" placeholder="Ej: 162"></div>
+      </div>
+      <div class="two">
+        <div class="field"><label for="m-sex">Sexo</label>
+          <select id="m-sex"><option value="">Prefiero no decir</option><option value="f">Mujer</option><option value="m">Hombre</option></select></div>
+        <div class="field"><label for="m-goalw">Peso objetivo (kg)</label><input id="m-goalw" type="number" inputmode="decimal" step="0.5" min="25" max="300" placeholder="Opcional"></div>
+      </div>
+      <div class="field"><label for="m-act">Actividad diaria</label>
+        <select id="m-act">
+          <option value="baja">Poca: casi siempre sentado/a</option>
+          <option value="moderada">Moderada: camino o hago tareas a diario</option>
+          <option value="activa">Activa: ejercicio varias veces por semana</option>
+        </select>
+        <span class="hint">Con esto calculo cuántas calorías y proteínas te convienen por día.</span>
+      </div>
+      <details class="adv">
+        <summary>Conexión avanzada</summary>
+        <div class="field">
+          <label for="m-key">Clave de Groq propia (opcional)</label>
+          <input id="m-key" type="password" autocomplete="off" placeholder="gsk_…">
+          <span class="hint">Reemplaza la clave actual. Se guarda solo en este navegador.</span>
+        </div>
+      </details>
+    </div>
+    <footer>
+      <button type="button" class="btn btn-ghost" id="m-cancel">Cancelar</button>
+      <button type="submit" class="btn btn-primary">Guardar cambios</button>
+    </footer>
+  </form>
+</div>
+
+<!-- ================= MODAL COMIDA ================= -->
+<div class="overlay hidden" id="food-modal" role="dialog" aria-modal="true" aria-labelledby="f-title">
+  <div class="modal">
+    <header>
+      <h3 id="f-title">Anotar comida</h3>
+      <button type="button" class="icon-btn" id="f-close" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </header>
+    <div class="m-body">
+      <div class="seg" id="f-meal" role="radiogroup" aria-label="Comida del día"></div>
+      <div class="field" style="margin-top:12px">
+        <label for="f-desc">¿Qué comiste?</label>
+        <div class="f-input">
+          <textarea id="f-desc" rows="2" placeholder="Ej: 2 empanadas salteñas de carne y una ensalada de tomate"></textarea>
+          <button type="button" class="icon-btn" id="f-cam" aria-label="Agregar foto del plato" title="Foto del plato">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          </button>
+        </div>
+        <div class="f-photo hidden" id="f-photo"><img id="f-photo-img" alt="Foto del plato"><button type="button" class="link" id="f-photo-rm">Quitar foto</button></div>
+        <input type="file" id="f-file" accept="image/*" capture="environment" class="hidden">
+      </div>
+      <button type="button" class="btn btn-primary" id="f-calc" style="width:100%">Calcular con IA</button>
+      <div id="f-recents"></div>
+      <div id="f-items"></div>
+    </div>
+    <footer>
+      <button type="button" class="btn btn-ghost" id="f-cancel">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="f-save" disabled>Guardar en el diario</button>
+    </footer>
+  </div>
+</div>
+<input type="file" id="imp-file" accept="application/json,.json" class="hidden">
+<div class="tip hidden" id="tip" role="tooltip"></div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+
+/* ===================== CONFIG GROQ ===================== */
+const GROQ_URL     = 'https://api.groq.com/openai/v1/chat/completions';
+// La clave NO se sube al repo (GitHub la bloquea). Pegala acá en tu copia local,
+// o cargala una vez en la pantalla inicial / Mis datos → Conexión avanzada.
+const KEY          = '';
+const MODEL        = 'llama-3.3-70b-versatile';
+// Modelo con visión de Groq, para que la foto se analice de verdad.
+// Si falla, se cae al MODEL de texto con la descripción "[El usuario envió una foto...]".
+const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
+const STORE_KEY    = 'ns_v4';
+const MAX_SAVED    = 60;   // msgs guardados
+const CTX_MSGS     = 14;   // msgs enviados como contexto
+const MAX_PDF_CHARS= 9000; // recorte del texto del PDF para no pasarnos de tokens
+
+if(window.pdfjsLib){
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}else{
+  console.error('[NutriSalta] PDF.js no cargó desde cdnjs. La lectura de PDFs no va a funcionar.');
+}
+
+/* ===================== ESTADO ===================== */
+let S = {
+  name:'', age:'', goals:'', conditions:'artrosis',
+  msgs:[], nMsgs:0, nImgs:0, nPdfs:0, since:null, clinHist:[],
+  // Contexto persistente
+  height:'',        // cm
+  weightLog:[],     // [{kg, date, src:'chat'|'pdf'|'manual'}]
+  facts:[],         // [{t, date}] datos durables que contó el usuario (alergias, gustos, rutina...)
+  // Diario
+  sex:'', activity:'baja', weightGoal:'',
+  log:{},           // {'YYYY-MM-DD': {meals:[{id,meal,name,qty,kcal,p,c,f,ts}], water:ml, feel:{pain,mood,sleep}}}
+  recents:[]        // últimas comidas para re-agregar con un toque
+};
+let pending = null;   // adjunto en preview: {type:'img'|'pdf', name, dataUrl?, text?, pages?, size}
+let busy = false;
+
+function load(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(raw){ S = Object.assign(S, JSON.parse(raw)); }
+  }catch(e){ console.warn('[NutriSalta] No se pudo leer localStorage', e); }
+  S.conditions = 'artrosis'; // hardcodeada siempre
+  if(!S.log || typeof S.log !== 'object') S.log = {};
+  ['msgs','clinHist','weightLog','facts','recents'].forEach(k => { if(!Array.isArray(S[k])) S[k] = []; });
+}
+function save(){
+  S.msgs = S.msgs.slice(-MAX_SAVED);
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(S)); }
+  catch(e){
+    console.warn('[NutriSalta] localStorage lleno, recorto historial', e);
+    try{ S.msgs = S.msgs.slice(-20); localStorage.setItem(STORE_KEY, JSON.stringify(S)); }catch(_){}
+  }
+}
+function apiKey(){
+  try{ return (localStorage.getItem(STORE_KEY+'_key') || '').trim() || KEY; }catch(_){ return KEY; }
+}
+
+/* ===================== SYSTEM PROMPT ===================== */
+/* Contexto de salud persistente que se inyecta en cada respuesta */
+function healthContext(){
+  const out = [];
+  // Medidas
+  const w = lastWeight();
+  if(w){
+    let line = `- Peso actual: ${w.kg} kg (registrado el ${fmtDate(w.date)})`;
+    const prev = S.weightLog.length > 1 ? S.weightLog[S.weightLog.length-2] : null;
+    if(prev){ const d = +(w.kg - prev.kg).toFixed(1); line += `; antes ${prev.kg} kg (${fmtDate(prev.date)}), diferencia ${d>0?'+':''}${d} kg`; }
+    out.push(line);
+  }else out.push('- Peso: no lo sabemos todavía (si viene al caso, preguntaselo con naturalidad).');
+  if(S.height) out.push(`- Altura: ${S.height} cm`);
+  const imc = bmi(); if(imc) out.push(`- IMC aproximado: ${imc}`);
+
+  // Valores de laboratorio: el más reciente de cada marcador
+  const latest = latestValues();
+  const studies = S.clinHist.filter(h => h.isStudy !== false);
+  if(studies.length){
+    out.push(`\nEstudios cargados (${studies.length}):`);
+    studies.slice(-6).forEach(h => out.push(`- ${h.kind || 'Estudio'} del ${h.studyDate ? fmtDate(h.studyDate) : fmtDate(h.date)}${h.summary ? ': ' + h.summary : ''}`));
+  }
+  if(latest.length){
+    out.push('\nÚltimos valores conocidos (usalos para personalizar las recomendaciones):');
+    latest.slice(0, 35).forEach(v => out.push(
+      `- ${v.nombre}: ${v.valor}${v.unidad ? ' ' + v.unidad : ''}` +
+      `${v.referencia ? ' (ref. ' + v.referencia + ')' : ''}` +
+      `${v.estado && v.estado !== 'sin_ref' ? ' → ' + v.estado : ''}` +
+      ` [${fmtDate(v.fecha)}]`));
+  }
+  if(!studies.length) out.push('- Todavía no subió estudios.');
+
+  // Diario: hoy y última semana
+  const T = targets(), today = getDay(dayKey(new Date()), false);
+  out.push(`\nMetas diarias estimadas: ${T.kcal} kcal, proteínas ${T.p} g, carbohidratos ${T.c} g, grasas ${T.f} g, agua ${(T.water/1000).toFixed(1)} L.`);
+  if(today){
+    const t = dayTotals(today);
+    if(today.meals.length){
+      out.push(`Hoy lleva comido: ${t.kcal} kcal (proteínas ${t.p} g, carbohidratos ${t.c} g, grasas ${t.f} g).`);
+      MEALS.forEach(m => { const it = today.meals.filter(x => x.meal === m.id); if(it.length) out.push(`- ${m.name}: ${it.map(x => x.name).join(', ')}`); });
+    }
+    if(today.water) out.push(`Agua hoy: ${(today.water/1000).toFixed(2)} L.`);
+    if(today.feel && today.feel.pain != null) out.push(`Dolor articular hoy: ${today.feel.pain}/10.`);
+    if(today.feel && today.feel.mood) out.push(`Ánimo hoy: ${MOODS[today.feel.mood]}.`);
+    if(today.feel && today.feel.sleep) out.push(`Durmió ${today.feel.sleep} h anoche.`);
+  }
+  const wk = weekStats();
+  if(wk.logged) out.push(`Últimos 7 días: registró comidas ${wk.logged} días, promedio ${wk.kcal} kcal${wk.pain != null ? ', dolor articular promedio ' + wk.pain + '/10' : ''}${wk.sleep ? ', sueño promedio ' + wk.sleep + ' h' : ''}${wk.water ? ', agua promedio ' + wk.water + ' L' : ''}.`);
+  if(S.weightGoal) out.push(`Peso objetivo: ${S.weightGoal} kg.`);
+
+  if(S.facts.length){
+    out.push('\nOtras cosas que te contó:');
+    S.facts.slice(-25).forEach(f => out.push('- ' + f.t));
+  }
+  return out.join('\n');
+}
+
+function systemPrompt(){
+  return `Sos NutriSalta, un asistente de nutrición y alimentación para ${S.name}, ${S.age} años, con artrosis.
+Objetivos de ${S.name}: ${S.goals || 'comer más sano y sentirse mejor'}.
+
+CONTEXTO DE SALUD DE ${S.name.toUpperCase()} (memoria persistente, tenelo siempre en cuenta):
+${healthContext()}
+
+Usá este contexto de forma natural: si un valor está alto o bajo, adaptá las recetas y consejos a eso sin repetirle los números a cada rato.
+
+ESTILO
+- Hablás de vos, como una persona de Salta (argentino salteño): cálido, cercano, simple. Usá expresiones locales con moderación.
+- Respuestas claras y breves. Usá listas cortas cuando ayuden. Nada de tecnicismos innecesarios.
+- Conocés a fondo la gastronomía del NOA: tamales, humita, locro, empanadas salteñas, mondongo, charqui, mote, api, arrope, quesillo, cabrito, llama, maíz morado, papa andina, quínoa, locoto. Proponé versiones más sanas de estos platos y adaptalas a la artrosis (antiinflamatorias, buen aporte de calcio, omega-3, vitamina D, control de peso).
+
+TEMAS PERMITIDOS
+- Solo hablás de: alimentación, nutrición, recetas, hidratación, ejercicio de bajo impacto (caminar, agua, estiramientos suaves) y bienestar.
+- Si te preguntan otra cosa, redirigí con amabilidad hacia la comida o el bienestar.
+- Podés mencionar: glucosa, colesterol, triglicéridos, hemoglobina, insulina, presión arterial, ácido úrico, tiroides, diabetes, hipertensión, anemia, osteoporosis.
+
+LÍMITES ESTRICTOS
+- NUNCA menciones: cáncer, tumor, maligno, leucemia, linfoma, metástasis ni ninguna enfermedad terminal. Si un análisis contiene marcadores o términos de ese tipo, ignoralos por completo y no los nombres.
+- NUNCA generes miedo ni angustia. Si un valor está fuera de rango, decilo con calma, explicá qué alimentos ayudan y sugerí comentarlo con su médico en el próximo control, sin dramatizar.
+- No diagnosticás ni recetás medicamentos.
+
+ESTUDIOS (PDF)
+- Cuando llega un estudio nuevo, explicá en simple los valores que tienen que ver con la alimentación (empezando por los que conviene mejorar) y dá recomendaciones de comida concretas. Si hay estudios anteriores, comentá la evolución con tono positivo.
+
+FOTOS DE COMIDA
+- Identificá el plato, estimá porciones, calorías aproximadas y macronutrientes, y decí qué tan bien le viene para la artrosis y sus objetivos. Sugerí un ajuste fácil.
+
+MEMORIA (invisible para el usuario)
+- Si en su último mensaje el usuario dice su peso, agregá al final una línea exacta: [[PESO: 78.5]]
+- Si dice su altura: [[ALTURA: 165]] (en cm)
+- Si cuenta un dato durable útil para su alimentación (alergia, intolerancia, comida que no le gusta, rutina, si vive solo, medicación que toma, actividad física), agregá: [[DATO: frase corta en tercera persona]]
+- Solo datos nuevos que no estén ya en el contexto. Si no hay nada nuevo, no agregues ninguna línea de memoria.
+
+CIERRE
+- Terminá SIEMPRE con un consejo nutricional concreto y motivador (una línea, empezando con "👉"), antes de cualquier línea de memoria.`;
+}
+
+/* ===================== MEMORIA / CONTEXTO ===================== */
+// Términos que nunca deben guardarse ni mostrarse (marcadores tumorales, etc.)
+const FORBIDDEN = /c[aá]ncer|tumor|malign|leucemia|linfoma|met[aá]stasis|oncol|neoplas|carcinoma|\bCEA\b|\bCA[\s-]?(125|15[.-]?3|19[.-]?9|72[.-]?4)\b|\bPSA\b|alfa[\s-]?feto|\bAFP\b|terminal/i;
+const clean = s => String(s || '').trim();
+
+function lastWeight(){ return S.weightLog.length ? S.weightLog[S.weightLog.length-1] : null; }
+function bmi(){
+  const w = lastWeight(), h = parseFloat(S.height);
+  if(!w || !h) return null;
+  return (w.kg / Math.pow(h/100, 2)).toFixed(1);
+}
+function addWeight(kg, src, date){
+  kg = +String(kg).replace(',', '.');
+  if(!(kg >= 25 && kg <= 300)) return false;
+  kg = +kg.toFixed(1);
+  const last = lastWeight();
+  const d = date || new Date().toISOString();
+  // Si es el mismo día y mismo valor, no duplico
+  if(last && last.kg === kg && last.date.slice(0,10) === d.slice(0,10)) return false;
+  S.weightLog.push({ kg, date:d, src });
+  S.weightLog.sort((a,b) => a.date.localeCompare(b.date));
+  S.weightLog = S.weightLog.slice(-50);
+  return true;
+}
+function setHeight(cm){
+  cm = +String(cm).replace(',', '.');
+  if(cm > 0 && cm < 3) cm = cm * 100;          // "1,65" → 165
+  if(!(cm >= 100 && cm <= 230)) return false;
+  S.height = String(Math.round(cm));
+  return true;
+}
+function addFact(t){
+  t = clean(t).replace(/\.$/, '');
+  if(!t || t.length > 160 || FORBIDDEN.test(t)) return false;
+  if(S.facts.some(f => f.t.toLowerCase() === t.toLowerCase())) return false;
+  S.facts.push({ t, date:new Date().toISOString() });
+  S.facts = S.facts.slice(-40);
+  return true;
+}
+// Valor más reciente de cada marcador entre todos los estudios
+function latestValues(){
+  const map = new Map();
+  S.clinHist.forEach(h => (h.values || []).forEach(v => {
+    const fecha = h.studyDate || h.date;
+    const k = v.nombre.toLowerCase();
+    const prev = map.get(k);
+    if(!prev || prev.fecha <= fecha) map.set(k, Object.assign({}, v, { fecha }));
+  }));
+  // primero los fuera de rango
+  return [...map.values()].sort((a,b) => (a.estado==='normal') - (b.estado==='normal'));
+}
+
+// Detecta peso/altura en lo que escribe el usuario (red de seguridad, además de las etiquetas del modelo)
+function detectFromText(text){
+  const found = [];
+  const t = text.toLowerCase();
+  let m = t.match(/(?:peso|pes[eé]|pesando|estoy en|baj[eé] a|sub[ií] a|llegu[eé] a)\D{0,12}(\d{2,3}(?:[.,]\d{1,2})?)\s*(?:kg|kilos?|k\b)?/);
+  if(!m) m = t.match(/\b(\d{2,3}(?:[.,]\d{1,2})?)\s*(?:kg|kilos)\b/);
+  if(m && addWeight(m[1], 'chat')) found.push('peso ' + lastWeight().kg + ' kg');
+  const h = t.match(/(?:mido|altura|estatura)\D{0,10}(\d(?:[.,]\d{1,2})|\d{3})\s*(?:m|cm|metros?)?/);
+  if(h && setHeight(h[1])) found.push('altura ' + S.height + ' cm');
+  return found;
+}
+// Saca las etiquetas [[...]] de la respuesta y las guarda
+function absorbMemory(reply){
+  const found = [];
+  const body = reply.replace(/\[\[\s*(PESO|ALTURA|DATO)\s*:\s*([^\]]+?)\s*\]\]/gi, (_, k, v) => {
+    k = k.toUpperCase();
+    if(k === 'PESO'   && addWeight(v.replace(/[^\d.,]/g,''), 'chat')) found.push('peso ' + lastWeight().kg + ' kg');
+    if(k === 'ALTURA' && setHeight(v.replace(/[^\d.,]/g,''))) found.push('altura ' + S.height + ' cm');
+    if(k === 'DATO'   && addFact(v)) found.push(v.length > 40 ? v.slice(0,40) + '…' : v);
+    return '';
+  }).replace(/\n{3,}/g, '\n\n').trim();
+  return { body, found };
+}
+
+/* ===================== ANÁLISIS DE ESTUDIOS (PDF) ===================== */
+async function analyzeStudy(text, fileName){
+  const prompt = `Analizá el texto extraído de un PDF llamado "${fileName}". Determiná si es un estudio médico (análisis de laboratorio, perfil lipídico, hemograma, densitometría, informe de control, etc.) y extraé los datos.
+Respondé SOLO con un objeto JSON con esta forma exacta:
+{
+  "es_estudio": true,
+  "tipo": "Análisis de sangre | Hemograma | Perfil lipídico | Densitometría | ... (corto)",
+  "fecha_estudio": "YYYY-MM-DD o null",
+  "laboratorio": "nombre o null",
+  "valores": [ { "nombre": "Glucosa", "valor": "110", "unidad": "mg/dL", "referencia": "70-100", "estado": "alto | bajo | normal | sin_ref" } ],
+  "peso_kg": null,
+  "altura_cm": null,
+  "resumen": "1 o 2 frases simples sobre lo que importa para la alimentación"
+}
+Reglas:
+- Incluí todos los valores numéricos del estudio con su unidad y rango de referencia si figura.
+- "estado" compará el valor con la referencia.
+- Usá nombres en español y cortos (ej: "Colesterol LDL", "Hemoglobina", "TSH", "Vitamina D").
+- NO incluyas marcadores tumorales ni nada relacionado con cáncer, tumores u oncología: omitilos por completo.
+- El resumen no debe alarmar.
+- Si no es un estudio médico, devolvé "es_estudio": false y "valores": [].
+
+TEXTO:
+"""
+${text}
+"""`;
+  const raw = await callGroq([
+    { role:'system', content:'Sos un extractor de datos de estudios médicos. Respondés únicamente JSON válido.' },
+    { role:'user', content:prompt }
+  ], MODEL, { json:true, temperature:0.1, max_tokens:2000 });
+  let j;
+  try{ j = JSON.parse(raw); }
+  catch(e){
+    const m = raw.match(/\{[\s\S]*\}/);
+    if(!m) throw Object.assign(new Error('No pude interpretar el estudio.'), { kind:'parse' });
+    j = JSON.parse(m[0]);
+  }
+  const estados = ['alto','bajo','normal','sin_ref'];
+  const values = (Array.isArray(j.valores) ? j.valores : [])
+    .map(v => ({
+      nombre: clean(v.nombre).slice(0,50),
+      valor: clean(v.valor).slice(0,20),
+      unidad: clean(v.unidad).slice(0,20),
+      referencia: clean(v.referencia).slice(0,40),
+      estado: estados.includes(clean(v.estado).toLowerCase()) ? clean(v.estado).toLowerCase() : 'sin_ref'
+    }))
+    .filter(v => v.nombre && v.valor && !FORBIDDEN.test(v.nombre + ' ' + v.referencia))
+    .slice(0, 60);
+  let fecha = /^\d{4}-\d{2}-\d{2}$/.test(clean(j.fecha_estudio)) ? clean(j.fecha_estudio) : null;
+  if(fecha && (new Date(fecha) > new Date() || new Date(fecha).getFullYear() < 1990)) fecha = null;
+  const summary = FORBIDDEN.test(j.resumen || '') ? '' : clean(j.resumen).slice(0, 300);
+  return {
+    isStudy: j.es_estudio !== false && values.length > 0,
+    kind: clean(j.tipo).slice(0,60) || 'Estudio',
+    studyDate: fecha ? fecha + 'T12:00:00.000Z' : null,
+    lab: FORBIDDEN.test(j.laboratorio || '') ? '' : clean(j.laboratorio).slice(0,60),
+    values, summary,
+    weight: j.peso_kg, height: j.altura_cm
+  };
+}
+function studyAsText(st){
+  return st.values.map(v => `${v.nombre}: ${v.valor}${v.unidad ? ' ' + v.unidad : ''}${v.referencia ? ' (ref. ' + v.referencia + ')' : ''}${v.estado !== 'sin_ref' ? ' → ' + v.estado : ''}`).join('\n');
+}
+
+/* ===================== LLAMADA A GROQ ===================== */
+async function callGroq(messages, model, opts){
+  opts = opts || {};
+  const body = { model, messages, temperature: opts.temperature ?? 0.6, max_tokens: opts.max_tokens || 1024 };
+  if(opts.json) body.response_format = { type: 'json_object' };
+  let res;
+  // 1) Error de red (sin respuesta: DNS, CORS, offline...)
+  try{
+    res = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + apiKey(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+  }catch(netErr){
+    console.error('[NutriSalta] Error de RED al llamar a Groq:', netErr);
+    const e = new Error('No pude conectarme. Revisá tu conexión a internet y probá de nuevo.');
+    e.kind = 'network';
+    throw e;
+  }
+  // 2) Error de respuesta (HTTP no-OK)
+  if(!res.ok){
+    let errText = '';
+    try{ errText = await res.text(); }catch(_){}
+    console.error('[NutriSalta] Groq respondió HTTP ' + res.status + ' ' + res.statusText + ':', errText);
+    let detail = '';
+    try{ detail = JSON.parse(errText).error.message || ''; }catch(_){ detail = errText.slice(0,200); }
+    const e = new Error(httpMessage(res.status, detail));
+    e.kind = 'http'; e.status = res.status; e.detail = detail;
+    throw e;
+  }
+  // 3) Respuesta OK pero JSON raro
+  let data;
+  try{ data = await res.json(); }
+  catch(parseErr){
+    console.error('[NutriSalta] No se pudo parsear la respuesta de Groq:', parseErr);
+    const e = new Error('La respuesta llegó incompleta. Probá de nuevo.'); e.kind='parse'; throw e;
+  }
+  const out = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+  if(!out){
+    console.error('[NutriSalta] Respuesta sin contenido:', data);
+    const e = new Error('No recibí respuesta del asistente. Probá de nuevo.'); e.kind='empty'; throw e;
+  }
+  return out.trim();
+}
+function httpMessage(status, detail){
+  if(status === 401) return 'La clave de Groq no es válida o fue revocada (401). Cargá una nueva en Mis datos → Conexión avanzada.';
+  if(status === 429) return 'Demasiadas consultas seguidas (429). Esperá un minuto y volvé a intentar.';
+  if(status === 413) return 'El mensaje es demasiado largo (413). Probá con un PDF más corto.';
+  if(status >= 500)  return 'Groq está con problemas (' + status + '). Probá en un rato.';
+  return 'Error ' + status + (detail ? ': ' + detail : '');
+}
+
+/* ===================== ENVIAR MENSAJE ===================== */
+async function send(){
+  if(busy) return;
+  const txtEl = $('#txt');
+  const text = txtEl.value.trim();
+  const att = pending;
+  if(!text && !att) return;
+
+  // Construyo contenido para el modelo y para mostrar
+  let apiContent = text;
+  let shown = text;
+  let attMeta = null;
+
+  if(att && att.type === 'pdf'){
+    shown = text || 'Te paso mi estudio.';
+    attMeta = {type:'pdf', name:att.name};
+    apiContent = rawPdfMessage(att, text);   // por si el análisis falla
+  }
+  if(att && att.type === 'img'){
+    apiContent = '[El usuario envió una foto de comida. Analizala nutricionalmente.]' + (text ? '\n' + text : '');
+    shown = text || 'Mirá lo que voy a comer.';
+    attMeta = {type:'img', name:att.name};
+    S.nImgs++;
+  }
+
+  const userMsg = { role:'user', content:apiContent, shown, att:attMeta, ts:Date.now() };
+  S.msgs.push(userMsg);
+  S.nMsgs++;
+  const learned = text ? detectFromText(text) : [];
+  save();
+
+  txtEl.value = ''; autosize(); clearPending();
+  renderMsg(userMsg, att && att.type === 'img' ? att.dataUrl : null);
+  setBusy(true);
+  const typingRow = showTyping();
+
+  try{
+    // PDF: primero lo analizo y lo guardo como contexto, después respondo
+    if(att && att.type === 'pdf'){
+      setStatusText('Analizando el estudio…');
+      userMsg.content = await processPdf(att, text);
+      save();
+    }
+
+    // Contexto: system (con memoria de salud) + últimos N mensajes
+    const ctx = S.msgs.slice(-CTX_MSGS).map(m => ({ role:m.role, content:m.content }));
+    const messages = [{ role:'system', content:systemPrompt() }, ...ctx];
+
+    setStatusText('Escribiendo…');
+    let reply;
+    if(att && att.type === 'img'){
+      reply = await sendWithImage(messages, att.dataUrl);
+    }else{
+      reply = await callGroq(messages, MODEL);
+    }
+    const mem = absorbMemory(reply);
+    typingRow.remove();
+    const botMsg = { role:'assistant', content:mem.body, ts:Date.now() };
+    if(att && att.type === 'img') imgCache[botMsg.ts] = { dataUrl: att.dataUrl, text };
+    S.msgs.push(botMsg); save();
+    renderMsg(botMsg);
+    const all = [...new Set([...learned, ...mem.found])];
+    if(all.length) toast('Lo anoto: ' + all.join(' · '));
+    setStatus(true);
+  }catch(err){
+    typingRow.remove();
+    renderError(err.message);
+    toast(err.message, true);
+    setStatus(false);
+  }finally{
+    setBusy(false);
+    refreshPanels();
+  }
+}
+
+function rawPdfMessage(att, text){
+  return `[El usuario subió un PDF: "${att.name}" (${att.pages} pág.). Texto extraído:]
+"""
+${att.text}
+"""
+${text ? '\nPregunta del usuario: ' + text : '\nExplicame estos resultados en relación a mi alimentación y la artrosis.'}`;
+}
+
+// Analiza el PDF con la IA, guarda el estudio en clinHist (contexto persistente)
+// y devuelve el contenido compacto que se manda al chat.
+async function processPdf(att, text){
+  const entry = { name: att.name, date: new Date().toISOString(), pages: att.pages };
+  S.nPdfs++;
+  let st;
+  try{
+    st = await analyzeStudy(att.text, att.name);
+  }catch(err){
+    if(err.kind === 'network') throw err;
+    console.warn('[NutriSalta] No se pudo estructurar el estudio, mando el texto crudo:', err);
+    S.clinHist.push(Object.assign(entry, { isStudy:true, kind:'Estudio', values:[], summary:'' }));
+    return rawPdfMessage(att, text);
+  }
+  if(!st.isStudy){
+    toast('Este PDF no parece un estudio médico. No lo agrego al historial clínico.');
+    return `[El usuario subió un PDF ("${att.name}") que no parece un estudio médico. Texto:]\n"""\n${att.text.slice(0, 3000)}\n"""` + (text ? '\n' + text : '');
+  }
+  Object.assign(entry, { isStudy:true, kind:st.kind, studyDate:st.studyDate, lab:st.lab, values:st.values, summary:st.summary });
+  S.clinHist.push(entry);
+  const extra = [];
+  if(st.weight && addWeight(st.weight, 'pdf', st.studyDate || undefined)) extra.push('peso ' + lastWeight().kg + ' kg');
+  if(st.height && !S.height && setHeight(st.height)) extra.push('altura ' + S.height + ' cm');
+  const fuera = st.values.filter(v => v.estado === 'alto' || v.estado === 'bajo').length;
+  toast(`Guardé tu ${st.kind.toLowerCase()}: ${st.values.length} valores` + (fuera ? `, ${fuera} para mirar` : '') + (extra.length ? ' · ' + extra.join(' · ') : ''));
+  return `[El usuario subió un estudio: ${st.kind}${st.studyDate ? ' del ' + fmtDate(st.studyDate) : ''}${st.lab ? ' (' + st.lab + ')' : ''}. Ya quedó guardado en su historial. Valores:]
+${studyAsText(st)}
+${text ? '\nPregunta del usuario: ' + text : '\nExplicale en simple qué significan estos resultados para su alimentación y la artrosis, empezando por lo que conviene mejorar.'}`;
+}
+
+// Intenta con modelo de visión enviando la imagen real; si falla, cae al modelo de texto.
+async function sendWithImage(messages, dataUrl){
+  const vis = messages.slice();
+  const last = vis[vis.length-1];
+  vis[vis.length-1] = {
+    role:'user',
+    content:[
+      { type:'text', text:last.content },
+      { type:'image_url', image_url:{ url:dataUrl } }
+    ]
+  };
+  // Los modelos de visión no aceptan system + imagen en todos los casos: paso el system como primer texto
+  const sys = vis.shift();
+  vis[vis.length-1].content[0].text = sys.content + '\n\n---\n' + vis[vis.length-1].content[0].text;
+  try{
+    return await callGroq(vis.slice(-6), VISION_MODEL);
+  }catch(err){
+    console.warn('[NutriSalta] Visión no disponible, uso modelo de texto:', err.message);
+    if(err.kind === 'network') throw err;
+    const fallback = messages.slice();
+    fallback[fallback.length-1] = { role:'user', content: last.content +
+      '\n(No pudiste ver la imagen. Pedile amablemente que te cuente qué plato es y la porción, y mientras tanto dale pautas generales para armar un plato saludable para la artrosis.)' };
+    return await callGroq(fallback, MODEL);
+  }
+}
+
+/* ===================== ADJUNTOS ===================== */
+async function onImage(file){
+  if(!file) return;
+  if(!file.type.startsWith('image/')){ toast('Elegí un archivo de imagen.', true); return; }
+  try{
+    const dataUrl = await readAsDataURL(file);       // FileReader → base64
+    const small = await shrinkImage(dataUrl, 1024);  // reduce peso para la API
+    pending = { type:'img', name:file.name || 'foto.jpg', dataUrl:small, size:file.size };
+    showPending();
+  }catch(e){
+    console.error('[NutriSalta] Error leyendo imagen', e);
+    toast('No pude leer la foto. Probá con otra.', true);
+  }
+}
+async function onPdf(file){
+  if(!file) return;
+  if(file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)){ toast('Elegí un archivo PDF.', true); return; }
+  if(!window.pdfjsLib){ toast('No se pudo cargar el lector de PDF. Revisá tu conexión y recargá la página.', true); return; }
+  toast('Leyendo el PDF…');
+  try{
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    let text = '';
+    for(let i=1; i<=pdf.numPages; i++){
+      const page = await pdf.getPage(i);
+      const tc = await page.getTextContent();
+      // Reconstruyo líneas respetando saltos (hasEOL) para que los valores queden juntos
+      let line = '';
+      for(const it of tc.items){
+        line += it.str + (it.hasEOL ? '\n' : ' ');
+      }
+      text += `\n--- Página ${i} ---\n` + line;
+    }
+    text = text.replace(/[ \t]+/g,' ').replace(/\n\s*\n+/g,'\n').trim();
+    if(text.replace(/--- Página \d+ ---/g,'').trim().length < 20){
+      toast('Este PDF parece escaneado (imagen) y no tiene texto para leer.', true);
+      return;
+    }
+    if(text.length > MAX_PDF_CHARS) text = text.slice(0, MAX_PDF_CHARS) + '\n[…texto recortado…]';
+    pending = { type:'pdf', name:file.name, text, pages:pdf.numPages, size:file.size };
+    showPending();
+    toast('PDF listo. Agregá una pregunta o enviá directo.');
+  }catch(e){
+    console.error('[NutriSalta] Error leyendo PDF', e);
+    toast('No pude leer el PDF. ¿Está protegido con contraseña?', true);
+  }
+}
+function readAsDataURL(file){
+  return new Promise((ok, fail) => {
+    const r = new FileReader();
+    r.onload = () => ok(r.result);
+    r.onerror = () => fail(r.error);
+    r.readAsDataURL(file);
+  });
+}
+function shrinkImage(dataUrl, max){
+  return new Promise(ok => {
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width*k); c.height = Math.round(img.height*k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      try{ ok(c.toDataURL('image/jpeg', 0.82)); }catch(_){ ok(dataUrl); }
+    };
+    img.onerror = () => ok(dataUrl);
+    img.src = dataUrl;
+  });
+}
+function showPending(){
+  const p = pending;
+  $('#preview').classList.remove('hidden');
+  $('#pv-name').textContent = p.name;
+  if(p.type === 'img'){
+    $('#pv-img').src = p.dataUrl; $('#pv-img').classList.remove('hidden'); $('#pv-pdf').classList.add('hidden');
+    $('#pv-meta').textContent = 'Foto de comida · ' + kb(p.size);
+  }else{
+    $('#pv-img').classList.add('hidden'); $('#pv-pdf').classList.remove('hidden');
+    $('#pv-meta').textContent = 'Análisis · ' + p.pages + (p.pages === 1 ? ' página' : ' páginas') + ' · ' + kb(p.size);
+  }
+  updateSend();
+  $('#txt').focus();
+}
+function clearPending(){
+  pending = null;
+  $('#preview').classList.add('hidden');
+  $('#pv-img').removeAttribute('src');
+  $('#f-img').value = ''; $('#f-pdf').value = '';
+  updateSend();
+}
+
+/* ===================== RENDER CHAT ===================== */
+const ICON_IMG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>';
+const ICON_PDF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>';
+
+function renderAll(){
+  const list = $('#msg-list');
+  list.innerHTML = '';
+  if(!S.msgs.length){ list.appendChild(emptyState()); return; }
+  S.msgs.forEach(m => renderMsg(m, null, true));
+  scrollDown(true);
+}
+function renderMsg(m, imgUrl, noScroll){
+  const list = $('#msg-list');
+  const empty = list.querySelector('.empty'); if(empty) empty.remove();
+  const row = document.createElement('div');
+  row.className = 'row ' + (m.role === 'user' ? 'user' : 'bot');
+  let inner = '';
+  if(m.role === 'user'){
+    if(imgUrl) inner += `<img class="thumb" src="${imgUrl}" alt="Foto enviada">`;
+    else if(m.att) inner += `<span class="att-tag">${m.att.type==='pdf'?ICON_PDF:ICON_IMG}${esc(m.att.name)}</span><br>`;
+    inner += esc(m.shown != null ? m.shown : m.content).replace(/\n/g,'<br>');
+  }else{
+    inner = md(m.content);
+  }
+  inner += `<span class="meta">${fmtTime(m.ts)}</span>`;
+  if(m.role !== 'user' && imgCache[m.ts]) inner += `<div class="bot-actions"><button class="btn btn-ghost" data-logimg="${m.ts}">Anotar este plato en el diario</button></div>`;
+  row.innerHTML = (m.role === 'user' ? '' : '<div class="avatar" aria-hidden="true">NS</div>') + `<div class="bubble">${inner}</div>`;
+  const lb = row.querySelector('[data-logimg]');
+  if(lb) lb.onclick = () => { const c = imgCache[m.ts]; openFood({ dataUrl:c.dataUrl, text:c.text, auto:true }); };
+  list.appendChild(row);
+  if(!noScroll) scrollDown();
+}
+function renderError(text){
+  const row = document.createElement('div');
+  row.className = 'row error';
+  row.innerHTML = `<div class="avatar" aria-hidden="true">!</div><div class="bubble">${esc(text)}</div>`;
+  $('#msg-list').appendChild(row); scrollDown();
+}
+function showTyping(){
+  const row = document.createElement('div');
+  row.className = 'row bot';
+  row.innerHTML = '<div class="avatar" aria-hidden="true">NS</div><div class="bubble" aria-label="NutriSalta está escribiendo"><span class="typing"><i></i><i></i><i></i></span></div>';
+  $('#msg-list').appendChild(row); scrollDown();
+  return row;
+}
+function emptyState(){
+  const d = document.createElement('div');
+  d.className = 'empty';
+  const starters = [
+    ['Receta', 'Un locro más liviano y antiinflamatorio'],
+    ['Desayuno', '¿Qué desayuno me conviene para las rodillas?'],
+    ['Antojo', '¿Puedo comer empanadas salteñas? ¿Cuántas?'],
+    ['Movimiento', 'Ejercicios suaves para hacer en casa']
+  ];
+  d.innerHTML = `<h2>Hola, ${esc(S.name)}</h2>
+    <p>Preguntame sobre comidas, recetas del norte, o mandame una foto del plato o tu último análisis.</p>
+    <div class="starters">${starters.map(s=>`<button class="starter" data-q="${esc(s[1])}"><small>${s[0]}</small>${esc(s[1])}</button>`).join('')}</div>`;
+  d.querySelectorAll('.starter').forEach(b => b.onclick = () => { $('#txt').value = b.dataset.q; updateSend(); send(); });
+  return d;
+}
+function scrollDown(instant){
+  const box = $('#msgs');
+  requestAnimationFrame(() => box.scrollTo({ top: box.scrollHeight, behavior: instant ? 'auto' : 'smooth' }));
+}
+
+/* Markdown mínimo y seguro (escapa primero) */
+function md(src){
+  const lines = esc(src).split('\n');
+  let html = '', list = null;
+  const inline = s => s
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/(^|[^*])\*(?!\s)(.+?)\*(?!\*)/g,'$1<em>$2</em>')
+    .replace(/`([^`]+)`/g,'<code>$1</code>');
+  const close = () => { if(list){ html += `</${list}>`; list = null; } };
+  for(const raw of lines){
+    const l = raw.trim();
+    let m;
+    if(!l){ close(); continue; }
+    if((m = l.match(/^#{1,6}\s+(.*)/))){ close(); html += `<h4>${inline(m[1])}</h4>`; continue; }
+    if((m = l.match(/^[-*•]\s+(.*)/))){ if(list!=='ul'){ close(); html+='<ul>'; list='ul'; } html += `<li>${inline(m[1])}</li>`; continue; }
+    if((m = l.match(/^\d+[.)]\s+(.*)/))){ if(list!=='ol'){ close(); html+='<ol>'; list='ol'; } html += `<li>${inline(m[1])}</li>`; continue; }
+    close(); html += `<p>${inline(l)}</p>`;
+  }
+  close();
+  return html;
+}
+
+/* ===================== PERFIL / HISTORIAL ===================== */
+function renderPerfil(){
+  const days = S.since ? Math.max(1, Math.ceil((Date.now() - new Date(S.since)) / 864e5)) : 1;
+  const w = lastWeight(), imc = bmi();
+  const wl = S.weightLog.slice(-6).reverse();
+  const srcName = {chat:'contado en el chat', pdf:'de un estudio', manual:'cargado a mano'};
+  $('#perfil-body').innerHTML = `
+    <h2 class="sec-title">Tus datos</h2>
+    <dl class="card" style="margin:0">
+      <div class="kv"><dt>Nombre</dt><dd>${esc(S.name)}</dd></div>
+      <div class="kv"><dt>Edad</dt><dd>${esc(String(S.age))} años</dd></div>
+      <div class="kv"><dt>Objetivos</dt><dd>${esc(S.goals) || '<span style="color:var(--text-3)">Sin definir</span>'}</dd></div>
+      <div class="kv"><dt>Condición</dt><dd><span class="badge">Artrosis</span></dd></div>
+      <div class="kv"><dt>Meta diaria</dt><dd>${targets().kcal.toLocaleString('es-AR')} kcal · ${targets().p} g de proteína</dd></div>
+      <div class="kv"><dt>Usás NutriSalta desde</dt><dd>${S.since ? fmtDate(S.since) : '—'} · ${days} ${days===1?'día':'días'}</dd></div>
+    </dl>
+
+    <h2 class="sec-title">Medidas</h2>
+    <div class="stats">
+      <div class="stat"><b>${w ? w.kg : '—'}</b><span>Peso (kg)</span></div>
+      <div class="stat"><b>${S.height || '—'}</b><span>Altura (cm)</span></div>
+      <div class="stat"><b>${imc || '—'}</b><span>IMC</span></div>
+    </div>
+    ${S.weightLog.length > 1 ? `<div class="card" style="margin-top:8px"><div class="chart" id="w-chart"></div><div class="chart-cap">Evolución del peso (kg)${S.weightGoal ? ' · la línea punteada es tu meta' : ''}</div></div>` : ''}
+    ${wl.length ? `<div class="card" style="margin-top:8px"><ul class="timeline">${wl.map((x,i) => {
+        const prev = S.weightLog[S.weightLog.length - 2 - i];
+        const d = prev ? +(x.kg - prev.kg).toFixed(1) : null;
+        return `<li><div class="body"><b>${x.kg} kg${d ? ` <span class="delta">${d>0?'+':''}${d}</span>` : ''}</b>
+          <span>${fmtDate(x.date)} · ${srcName[x.src] || ''}</span></div></li>`;
+      }).join('')}</ul></div>`
+      : `<p class="hint" style="margin:8px 2px 0">Contale tu peso en el chat (ej: "hoy me pesé, 78 kilos") o cargalo en Editar mis datos. Lo uso para ajustar porciones.</p>`}
+
+    <h2 class="sec-title">Lo que NutriSalta sabe de vos</h2>
+    <div class="card">${S.facts.length
+      ? `<ul class="timeline">${S.facts.map((f,i) => `<li><div class="body"><b style="white-space:normal">${esc(f.t)}</b><span>${fmtDate(f.date)}</span></div>
+          <button class="icon-btn" data-fact="${i}" aria-label="Olvidar este dato" title="Olvidar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></li>`).join('')}</ul>`
+      : `<div class="blank">Cuando me cuentes cosas como alergias, gustos o tu rutina, las anoto acá para tenerlas en cuenta.</div>`}</div>
+
+    <h2 class="sec-title">Actividad</h2>
+    <div class="stats">
+      <div class="stat"><b>${S.nMsgs}</b><span>Consultas</span></div>
+      <div class="stat"><b>${S.nImgs}</b><span>Fotos de platos</span></div>
+      <div class="stat"><b>${S.nPdfs}</b><span>PDFs leídos</span></div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-ghost" id="p-edit">Editar mis datos</button>
+      <button class="btn btn-ghost" id="p-clear">Borrar conversación</button>
+      <button class="btn btn-danger" id="p-reset">Empezar de cero</button>
+    </div>
+    <h2 class="sec-title">Tus datos son tuyos</h2>
+    <p class="hint" style="margin:0 2px 10px">Todo queda guardado solo en este dispositivo. Descargá una copia para no perderla o para pasarla a otro teléfono.</p>
+    <div class="actions" style="margin-top:0">
+      <button class="btn btn-ghost" id="p-export">Descargar copia</button>
+      <button class="btn btn-ghost" id="p-import">Restaurar copia</button>
+    </div>`;
+  if($('#w-chart')) drawWeightChart($('#w-chart'), S.weightLog, S.weightGoal);
+  $('#p-export').onclick = exportData;
+  $('#p-import').onclick = () => $('#imp-file').click();
+  $('#perfil-body').querySelectorAll('[data-fact]').forEach(b => b.onclick = () => {
+    S.facts.splice(+b.dataset.fact, 1); save(); renderPerfil(); toast('Listo, lo olvidé.');
+  });
+  $('#p-edit').onclick = openModal;
+  $('#p-clear').onclick = () => {
+    if(!confirm('¿Borrar la conversación? Tus datos, medidas y estudios se mantienen.')) return;
+    S.msgs = []; save(); renderAll(); toast('Conversación borrada.');
+  };
+  $('#p-reset').onclick = () => {
+    if(!confirm('Esto borra todos tus datos, la conversación y el historial. ¿Seguimos?')) return;
+    try{ localStorage.removeItem(STORE_KEY); }catch(_){}
+    location.reload();
+  };
+}
+function renderHistorial(){
+  const studies = S.clinHist.map((h,i) => Object.assign({ i }, h)).filter(h => h.isStudy !== false).reverse();
+  const estadoTxt = { alto:'Alto', bajo:'Bajo', normal:'Normal', sin_ref:'' };
+  const studyCard = h => {
+    const vals = (h.values || []).slice().sort((a,b) => (a.estado==='normal') - (b.estado==='normal'));
+    const fuera = vals.filter(v => v.estado === 'alto' || v.estado === 'bajo').length;
+    return `<article class="card study">
+      <header class="study-head">
+        <div class="ico">PDF</div>
+        <div class="body">
+          <b>${esc(h.kind || 'Estudio')}</b>
+          <span>${h.studyDate ? 'Estudio del ' + fmtDate(h.studyDate) : 'Subido el ' + fmtDate(h.date)}${h.lab ? ' · ' + esc(h.lab) : ''}</span>
+          <span class="file">${esc(h.name)}</span>
+        </div>
+        <button class="icon-btn" data-del="${h.i}" aria-label="Quitar este estudio" title="Quitar del historial"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
+      </header>
+      ${h.summary ? `<p class="study-sum">${esc(h.summary)}</p>` : ''}
+      ${vals.length ? `
+        <details class="vals" ${fuera ? '' : ''}>
+          <summary>${vals.length} valores${fuera ? ` · <span class="pill warn">${fuera} para mirar</span>` : ` · <span class="pill ok">todo en rango</span>`}</summary>
+          <table class="vtable"><tbody>${vals.map(v => `<tr>
+            <td>${esc(v.nombre)}</td>
+            <td class="num">${esc(v.valor)} <small>${esc(v.unidad)}</small></td>
+            <td class="ref">${v.referencia ? esc(v.referencia) : ''}</td>
+            <td>${estadoTxt[v.estado] ? `<span class="pill ${v.estado==='normal'?'ok':'warn'}">${estadoTxt[v.estado]}</span>` : ''}</td>
+          </tr>`).join('')}</tbody></table>
+        </details>` : `<p class="study-sum hint">No pude leer valores de este PDF; igual lo tengo en cuenta.</p>`}
+    </article>`;
+  };
+  const list = studies.length
+    ? studies.map(studyCard).join('')
+    : `<div class="card"><div class="blank"><b>Todavía no subiste estudios</b>Tocá el ícono de documento en el chat y elegí el PDF de tu último análisis. Lo leo, guardo los valores y los uso para darte mejores consejos.</div></div>`;
+  const photos = S.msgs.filter(m => m.att && m.att.type === 'img').slice(-10).reverse();
+  const photoList = photos.length
+    ? `<ul class="timeline">${photos.map(m=>`
+        <li><div class="ico" style="background:var(--ok-soft);color:var(--ok)">IMG</div>
+          <div class="body"><b>${esc(m.shown || 'Foto de comida')}</b><span>${fmtDate(new Date(m.ts).toISOString())} · ${fmtTime(m.ts)}</span></div>
+        </li>`).join('')}</ul>`
+    : `<div class="blank"><b>Sin fotos de platos</b>Sacale una foto a lo que vas a comer y te digo cómo viene para tus articulaciones.</div>`;
+  $('#historial-body').innerHTML = `
+    <h2 class="sec-title">Historial clínico · ${studies.length} ${studies.length===1?'estudio':'estudios'}</h2>
+    <div class="study-list">${list}</div>
+    <p class="hint" style="margin:8px 2px 0">Se arma solo con los PDFs que subís. NutriSalta usa los últimos valores de cada estudio en todas sus respuestas.</p>
+    <h2 class="sec-title">Platos analizados</h2>
+    <div class="card">${photoList}</div>`;
+  $('#historial-body').querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
+    const h = S.clinHist[+b.dataset.del];
+    if(!confirm(`¿Quitar "${h.kind || h.name}" del historial? Dejo de usar esos valores.`)) return;
+    S.clinHist.splice(+b.dataset.del, 1); save(); renderHistorial(); toast('Estudio quitado.');
+  });
+}
+function refreshPanels(){ renderPerfil(); renderHistorial(); renderHoy(); }
+
+/* ===================== DIARIO ===================== */
+const MEALS = [
+  { id:'desayuno', name:'Desayuno' }, { id:'almuerzo', name:'Almuerzo' },
+  { id:'merienda', name:'Merienda' }, { id:'cena', name:'Cena' }, { id:'colacion', name:'Colación' }
+];
+const MOODS = { bajo:'con bajón', normal:'normal', bien:'muy bien' };
+const GLASS = 250; // ml
+const imgCache = {}; // fotos de esta sesión (no se guardan en localStorage)
+let curDay = null;
+let food = null;     // estado del modal de comida
+
+function dayKey(d){ const x = new Date(d); return x.getFullYear() + '-' + String(x.getMonth()+1).padStart(2,'0') + '-' + String(x.getDate()).padStart(2,'0'); }
+function keyToDate(k){ const [y,m,d] = k.split('-').map(Number); return new Date(y, m-1, d, 12); }
+function getDay(k, create){
+  if(!S.log[k]){
+    if(create === false) return null;
+    S.log[k] = { meals:[], water:0, feel:{} };
+  }
+  return S.log[k];
+}
+function pruneLog(){
+  const keys = Object.keys(S.log).sort();
+  keys.slice(0, Math.max(0, keys.length - 180)).forEach(k => delete S.log[k]);
+}
+function dayTotals(d){
+  const t = { kcal:0, p:0, c:0, f:0 };
+  (d ? d.meals : []).forEach(m => { t.kcal += +m.kcal||0; t.p += +m.p||0; t.c += +m.c||0; t.f += +m.f||0; });
+  return { kcal:Math.round(t.kcal), p:Math.round(t.p), c:Math.round(t.c), f:Math.round(t.f) };
+}
+// Metas: Mifflin-St Jeor × actividad, ajuste por objetivo; proteína alta para cuidar músculo y articulaciones
+function targets(){
+  const w = lastWeight() ? lastWeight().kg : null, h = +S.height || null, a = +S.age || 60;
+  let kcal = 1800, known = false;
+  if(w && h){
+    const base = 10*w + 6.25*h - 5*a + (S.sex === 'm' ? 5 : S.sex === 'f' ? -161 : -78);
+    const fac = { baja:1.3, moderada:1.45, activa:1.6 }[S.activity] || 1.3;
+    kcal = base * fac;
+    const wantsLoss = /baj|adelgaz|perder/i.test(S.goals) || (S.weightGoal && +S.weightGoal < w - 1);
+    const wantsGain = (S.weightGoal && +S.weightGoal > w + 1) || /subir de peso|ganar peso/i.test(S.goals);
+    if(wantsLoss) kcal *= 0.85; else if(wantsGain) kcal *= 1.1;
+    kcal = Math.max(1200, kcal); known = true;
+  }
+  kcal = Math.round(kcal / 10) * 10;
+  const p = Math.round((w || 70) * 1.1);
+  const f = Math.round(kcal * 0.30 / 9);
+  const c = Math.max(100, Math.round((kcal - p*4 - f*9) / 4));
+  const water = Math.round(Math.min(3000, Math.max(1500, (w || 65) * 30)) / GLASS) * GLASS;
+  return { kcal, p, c, f, water, known };
+}
+function weekStats(){
+  const days = []; for(let i=6; i>=0; i--){ const d = new Date(); d.setDate(d.getDate()-i); days.push(dayKey(d)); }
+  let logged = 0, kcal = 0, pain = [], sleep = [], water = [], series = [];
+  days.forEach(k => {
+    const d = S.log[k]; const t = dayTotals(d);
+    series.push({ k, kcal: t.kcal });
+    if(d && d.meals.length){ logged++; kcal += t.kcal; }
+    if(d && d.feel && d.feel.pain != null) pain.push(d.feel.pain);
+    if(d && d.feel && d.feel.sleep) sleep.push(d.feel.sleep);
+    if(d && d.water) water.push(d.water);
+  });
+  const avg = a => a.length ? +(a.reduce((x,y) => x+y, 0) / a.length).toFixed(1) : null;
+  // Días seguidos anotando comidas, terminando hoy (o ayer, si hoy todavía no anotó)
+  const has = i => { const d = new Date(); d.setDate(d.getDate()-i); const x = S.log[dayKey(d)]; return !!(x && x.meals.length); };
+  let streak = 0; for(let i = has(0) ? 0 : 1; i < 400 && has(i); i++) streak++;
+  return { logged, kcal: logged ? Math.round(kcal/logged) : 0, pain: avg(pain), sleep: avg(sleep), water: water.length ? +(avg(water)/1000).toFixed(1) : null, series, streak };
+}
+function mealByHour(){ const h = new Date().getHours(); return h < 11 ? 'desayuno' : h < 15 ? 'almuerzo' : h < 19 ? 'merienda' : h < 23 ? 'cena' : 'colacion'; }
+
+const SVG_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+const SVG_PLUS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
+
+function renderHoy(){
+  if(!curDay) curDay = dayKey(new Date());
+  const isToday = curDay === dayKey(new Date());
+  const d = getDay(curDay, false) || { meals:[], water:0, feel:{} };
+  const T = targets(), t = dayTotals(d);
+  const left = T.kcal - t.kcal;
+  const C = 2 * Math.PI * 56, pct = Math.min(1, t.kcal / T.kcal);
+  const dateLbl = keyToDate(curDay).toLocaleDateString('es-AR', { weekday:'long', day:'numeric', month:'long' });
+  const meter = (name, v, goal) => `<div class="meter"><div class="lbl"><b>${name}</b><em>${v} / ${goal} g</em></div><div class="bar"><i style="width:${Math.min(100, v/goal*100)}%"></i></div></div>`;
+  const glasses = Math.max(6, Math.round(T.water / GLASS));
+  const nOn = Math.round((d.water||0) / GLASS);
+  const feel = d.feel || {};
+  const wk = weekStats();
+
+  $('#hoy-body').innerHTML = `
+    <div class="daynav">
+      <button class="icon-btn" id="d-prev" aria-label="Día anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg></button>
+      <div class="mid"><b>${isToday ? 'Hoy' : dateLbl.charAt(0).toUpperCase() + dateLbl.slice(1)}</b><span>${isToday ? dateLbl : '<button class="link" id="d-today">Volver a hoy</button>'}</span></div>
+      <button class="icon-btn" id="d-next" aria-label="Día siguiente" ${isToday ? 'disabled' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg></button>
+    </div>
+
+    <section class="card" aria-label="Energía del día">
+      <div class="energy">
+        <div class="ring" role="img" aria-label="${t.kcal} de ${T.kcal} kilocalorías">
+          <svg viewBox="0 0 132 132"><circle class="track" cx="66" cy="66" r="56" fill="none" stroke-width="11"/>
+            <circle class="val" cx="66" cy="66" r="56" fill="none" stroke-width="11" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - pct)}"/></svg>
+          <div class="center"><b>${Math.abs(left).toLocaleString('es-AR')}</b><span>${left >= 0 ? 'kcal disponibles' : 'kcal por encima'}</span></div>
+        </div>
+        <div class="meters">
+          ${meter('Proteínas', t.p, T.p)}
+          ${meter('Carbohidratos', t.c, T.c)}
+          ${meter('Grasas', t.f, T.f)}
+        </div>
+      </div>
+      <div class="goal-note">${t.kcal.toLocaleString('es-AR')} de ${T.kcal.toLocaleString('es-AR')} kcal. ${T.known ? 'Meta calculada con tu peso, altura, edad y actividad.' : 'Meta orientativa: <button class="link" id="g-fix">cargá peso y altura</button> para calcularla a tu medida.'}</div>
+    </section>
+
+    <h2 class="sec-title">Comidas</h2>
+    <section class="card">
+      ${MEALS.map(m => {
+        const it = d.meals.filter(x => x.meal === m.id);
+        const kc = it.reduce((a,x) => a + (+x.kcal||0), 0);
+        return `<div class="meal">
+          <div class="meal-h"><b>${m.name}</b>${it.length ? `<span>${Math.round(kc)} kcal</span>` : ''}
+            <button class="icon-btn" data-addmeal="${m.id}" aria-label="Agregar a ${m.name}">${SVG_PLUS}</button></div>
+          ${it.length ? `<ul>${it.map(x => `<li><div class="n">${esc(x.name)}<small>${esc(x.qty || '')}${x.qty ? ' · ' : ''}P ${Math.round(x.p)} · C ${Math.round(x.c)} · G ${Math.round(x.f)} g</small></div>
+            <span class="k">${Math.round(x.kcal)} kcal</span>
+            <button class="icon-btn" data-delfood="${x.id}" aria-label="Quitar ${esc(x.name)}">${SVG_X}</button></li>`).join('')}</ul>` : ''}
+        </div>`;
+      }).join('')}
+    </section>
+    <button class="btn btn-primary add-food" id="add-food">Anotar comida</button>
+
+    <h2 class="sec-title">Agua</h2>
+    <section class="card water">
+      <div class="head"><b>${nOn} de ${glasses} vasos</b><span>${((d.water||0)/1000).toLocaleString('es-AR')} / ${(T.water/1000).toLocaleString('es-AR')} L</span></div>
+      <div class="glasses" style="--n:${Math.max(glasses, nOn)}">${Array.from({length: Math.max(glasses, nOn)}, (_,i) => `<button class="glass ${i < nOn ? 'on' : ''}" data-glass="${i}" aria-label="${i < nOn ? 'Quitar' : 'Sumar'} vaso ${i+1}" aria-pressed="${i < nOn}"></button>`).join('')}</div>
+    </section>
+
+    <h2 class="sec-title">¿Cómo te sentís?</h2>
+    <section class="card feel">
+      <div>
+        <div class="q">Dolor en las articulaciones <span>${feel.pain != null ? feel.pain + '/10' : 'sin registrar'}</span></div>
+        <div class="scale" role="radiogroup" aria-label="Dolor de 0 a 10">${Array.from({length:11}, (_,i) => `<button role="radio" aria-checked="${feel.pain === i}" class="${feel.pain === i ? 'on' : ''}" data-pain="${i}">${i}</button>`).join('')}</div>
+        <div class="scale-ends"><span>Nada</span><span>Mucho</span></div>
+      </div>
+      <div>
+        <div class="q">Ánimo</div>
+        <div class="seg" role="radiogroup" aria-label="Ánimo">${Object.entries({bajo:'Con bajón', normal:'Normal', bien:'Muy bien'}).map(([k,v]) => `<button role="radio" aria-checked="${feel.mood === k}" class="${feel.mood === k ? 'on' : ''}" data-mood="${k}">${v}</button>`).join('')}</div>
+      </div>
+      <div>
+        <div class="q">Horas de sueño</div>
+        <div class="stepper"><button data-sleep="-0.5" aria-label="Menos sueño">−</button><b>${feel.sleep ? feel.sleep + ' h' : '—'}</b><button data-sleep="0.5" aria-label="Más sueño">+</button></div>
+      </div>
+    </section>
+
+    <h2 class="sec-title">Tu semana</h2>
+    <section class="card">
+      <div class="chart" id="wk-chart"></div>
+      <div class="chart-cap">Calorías por día · la línea punteada es tu meta (${T.kcal.toLocaleString('es-AR')} kcal)</div>
+      <div class="mini-stats">
+        <div><b>${wk.streak}</b><span>${wk.streak === 1 ? 'día seguido' : 'días seguidos'} anotando</span></div>
+        <div><b>${wk.water != null ? wk.water + ' L' : '—'}</b><span>agua promedio</span></div>
+        <div><b>${wk.pain != null ? wk.pain : '—'}</b><span>dolor promedio</span></div>
+      </div>
+    </section>`;
+
+  drawWeekChart($('#wk-chart'), wk.series, T.kcal);
+
+  // Eventos
+  $('#d-prev').onclick = () => { const x = keyToDate(curDay); x.setDate(x.getDate()-1); curDay = dayKey(x); renderHoy(); };
+  $('#d-next').onclick = () => { const x = keyToDate(curDay); x.setDate(x.getDate()+1); curDay = dayKey(x); renderHoy(); };
+  const tb = $('#d-today'); if(tb) tb.onclick = () => { curDay = dayKey(new Date()); renderHoy(); };
+  const gf = $('#g-fix'); if(gf) gf.onclick = openModal;
+  $('#add-food').onclick = () => openFood({});
+  const body = $('#hoy-body');
+  body.querySelectorAll('[data-addmeal]').forEach(b => b.onclick = () => openFood({ meal:b.dataset.addmeal }));
+  body.querySelectorAll('[data-delfood]').forEach(b => b.onclick = () => {
+    const day = getDay(curDay); day.meals = day.meals.filter(x => x.id !== b.dataset.delfood); save(); renderHoy();
+  });
+  body.querySelectorAll('[data-glass]').forEach(b => b.onclick = () => {
+    const i = +b.dataset.glass, day = getDay(curDay);
+    const n = Math.round((day.water||0) / GLASS);
+    day.water = (i + 1 === n ? i : i + 1) * GLASS; save(); renderHoy();
+  });
+  body.querySelectorAll('[data-pain]').forEach(b => b.onclick = () => {
+    const day = getDay(curDay); const v = +b.dataset.pain;
+    day.feel.pain = day.feel.pain === v ? null : v; save(); renderHoy();
+  });
+  body.querySelectorAll('[data-mood]').forEach(b => b.onclick = () => {
+    const day = getDay(curDay); day.feel.mood = day.feel.mood === b.dataset.mood ? null : b.dataset.mood; save(); renderHoy();
+  });
+  body.querySelectorAll('[data-sleep]').forEach(b => b.onclick = () => {
+    const day = getDay(curDay); const v = (day.feel.sleep || 7) + (day.feel.sleep ? +b.dataset.sleep : 0);
+    day.feel.sleep = Math.min(14, Math.max(0, v)) || null; save(); renderHoy();
+  });
+}
+
+/* --- Gráficos (SVG, una serie, tooltip al pasar) --- */
+function showTip(e, html){
+  const t = $('#tip'); t.innerHTML = html; t.classList.remove('hidden');
+  const r = e.target.getBoundingClientRect();
+  t.style.left = (r.left + r.width/2) + 'px'; t.style.top = r.top + 'px';
+}
+function hideTip(){ $('#tip').classList.add('hidden'); }
+function bindTips(root){
+  root.querySelectorAll('[data-tip]').forEach(el => {
+    el.addEventListener('mouseenter', e => showTip(e, el.dataset.tip));
+    el.addEventListener('focus', e => showTip(e, el.dataset.tip));
+    el.addEventListener('mouseleave', hideTip); el.addEventListener('blur', hideTip);
+    el.addEventListener('click', e => showTip(e, el.dataset.tip));
+  });
+}
+function niceMax(v){ const p = Math.pow(10, Math.floor(Math.log10(v))); return Math.ceil(v / p * 2) / 2 * p; }
+function drawWeekChart(el, series, goal){
+  const W = 320, H = 150, L = 34, R = 4, Tp = 8, B = 22;
+  const max = niceMax(Math.max(goal * 1.15, ...series.map(s => s.kcal), 1));
+  const y = v => Tp + (H - Tp - B) * (1 - v / max);
+  const bw = (W - L - R) / series.length, barW = Math.min(26, bw - 8);
+  const today = dayKey(new Date());
+  const ticks = [0, max/2, max];
+  let g = ticks.map(v => `<line class="gl" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/><text class="axis" x="${L-6}" y="${y(v)+3}" text-anchor="end">${v >= 1000 ? (v/1000).toLocaleString('es-AR') + 'k' : v}</text>`).join('');
+  series.forEach((s, i) => {
+    const x = L + i*bw + (bw - barW)/2, top = y(s.kcal), h = Math.max(0, y(0) - top);
+    const dl = keyToDate(s.k).toLocaleDateString('es-AR', { weekday:'short' }).replace('.', '');
+    const r = Math.min(4, barW/2, h);
+    const path = h > 0 ? `M${x},${y(0)} V${top + r} Q${x},${top} ${x + r},${top} H${x + barW - r} Q${x + barW},${top} ${x + barW},${top + r} V${y(0)} Z` : '';
+    g += `<rect class="hit" x="${L + i*bw}" y="${Tp}" width="${bw}" height="${H - Tp - B}" tabindex="0" data-tip="${esc(keyToDate(s.k).toLocaleDateString('es-AR',{weekday:'long', day:'numeric'}))}: <b>${s.kcal.toLocaleString('es-AR')} kcal</b>"/>`;
+    if(path) g += `<path class="b ${s.k === today ? 'today' : ''}" d="${path}"/>`;
+    g += `<text class="axis" x="${x + barW/2}" y="${H - 6}" text-anchor="middle" ${s.k === today ? 'style="font-weight:700;fill:var(--text)"' : ''}>${dl}</text>`;
+  });
+  g += `<line class="goal" x1="${L}" x2="${W-R}" y1="${y(goal)}" y2="${y(goal)}"/>`;
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Calorías de los últimos 7 días">${g}</svg>`;
+  bindTips(el);
+}
+function drawWeightChart(el, log, goalW){
+  const pts = log.slice(-20);
+  if(pts.length < 2){ el.innerHTML = ''; return; }
+  const W = 320, H = 140, L = 34, R = 10, Tp = 10, B = 22;
+  const vals = pts.map(p => p.kg).concat(goalW ? [+goalW] : []);
+  let lo = Math.floor(Math.min(...vals) - 1), hi = Math.ceil(Math.max(...vals) + 1);
+  const t0 = new Date(pts[0].date).getTime(), t1 = new Date(pts[pts.length-1].date).getTime() || t0 + 1;
+  const x = d => L + (W - L - R) * ((new Date(d).getTime() - t0) / Math.max(1, t1 - t0));
+  const y = v => Tp + (H - Tp - B) * (1 - (v - lo) / (hi - lo));
+  let g = [lo, Math.round((lo+hi)/2), hi].map(v => `<line class="gl" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/><text class="axis" x="${L-6}" y="${y(v)+3}" text-anchor="end">${v}</text>`).join('');
+  if(goalW) g += `<line class="goal" x1="${L}" x2="${W-R}" y1="${y(+goalW)}" y2="${y(+goalW)}"/><text class="axis" x="${W-R}" y="${y(+goalW)-4}" text-anchor="end">meta ${goalW}</text>`;
+  g += `<path class="ln" d="${pts.map((p,i) => (i ? 'L' : 'M') + x(p.date).toFixed(1) + ',' + y(p.kg).toFixed(1)).join(' ')}"/>`;
+  g += `<text class="axis" x="${L}" y="${H-6}">${fmtDate(pts[0].date)}</text><text class="axis" x="${W-R}" y="${H-6}" text-anchor="end">${fmtDate(pts[pts.length-1].date)}</text>`;
+  pts.forEach(p => { g += `<circle class="dot" cx="${x(p.date)}" cy="${y(p.kg)}" r="4"/><circle class="hit" cx="${x(p.date)}" cy="${y(p.kg)}" r="12" tabindex="0" data-tip="${esc(fmtDate(p.date))}: <b>${p.kg} kg</b>"/>`; });
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Evolución del peso">${g}</svg>`;
+  bindTips(el);
+}
+
+/* --- Modal de comida: describir o foto → IA estima → revisar → guardar --- */
+function openFood(o){
+  food = { meal: o.meal || mealByHour(), items: [], dataUrl: o.dataUrl || null, loading:false };
+  $('#f-desc').value = o.text || '';
+  $('#f-meal').innerHTML = MEALS.map(m => `<button type="button" role="radio" data-m="${m.id}">${m.name}</button>`).join('');
+  $('#f-meal').querySelectorAll('button').forEach(b => b.onclick = () => { food.meal = b.dataset.m; paintFood(); });
+  $('#f-title').textContent = curDay && curDay !== dayKey(new Date()) ? 'Anotar comida · ' + keyToDate(curDay).toLocaleDateString('es-AR',{day:'numeric', month:'short'}) : 'Anotar comida';
+  paintFood();
+  $('#food-modal').classList.remove('hidden');
+  if(o.auto && food.dataUrl) estimateNow();
+  else setTimeout(() => $('#f-desc').focus(), 30);
+}
+function closeFood(){ $('#food-modal').classList.add('hidden'); food = null; $('#f-file').value = ''; }
+function paintFood(){
+  $('#f-meal').querySelectorAll('button').forEach(b => { const on = b.dataset.m === food.meal; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
+  $('#f-photo').classList.toggle('hidden', !food.dataUrl);
+  if(food.dataUrl) $('#f-photo-img').src = food.dataUrl;
+  $('#f-calc').disabled = food.loading;
+  $('#f-calc').className = 'btn ' + (food.items.length && !food.loading ? 'btn-ghost' : 'btn-primary');
+  $('#f-calc').textContent = food.loading ? 'Calculando…' : (food.items.length ? 'Volver a calcular' : 'Calcular con IA');
+  // Recientes
+  const rec = S.recents.filter(r => !food.items.some(i => i.name === r.name)).slice(0, 8);
+  $('#f-recents').innerHTML = rec.length ? `<div class="f-rec"><span class="hint">Comidas recientes · tocá para sumar</span><div class="chips">${rec.map((r,i) => `<button type="button" class="chip" data-rec="${i}">${esc(r.name)} · ${Math.round(r.kcal)}</button>`).join('')}</div></div>` : '';
+  $('#f-recents').querySelectorAll('[data-rec]').forEach(b => b.onclick = () => { food.items.push(Object.assign({}, rec[+b.dataset.rec])); paintFood(); });
+  // Lista a revisar
+  const tot = food.items.reduce((a,x) => ({ kcal:a.kcal + x.kcal, p:a.p + x.p, c:a.c + x.c, f:a.f + x.f }), { kcal:0, p:0, c:0, f:0 });
+  $('#f-items').innerHTML = `${food.items.length ? `<div class="f-list">${food.items.map((x,i) => `<div class="f-row">
+      <div class="n">${esc(x.name)}<small>${esc(x.qty || '')}${x.qty ? ' · ' : ''}P ${Math.round(x.p)} · C ${Math.round(x.c)} · G ${Math.round(x.f)} g</small></div>
+      <span class="k">${Math.round(x.kcal)} kcal</span>
+      <button type="button" class="icon-btn" data-rm="${i}" aria-label="Quitar ${esc(x.name)}">${SVG_X}</button></div>`).join('')}
+      <div class="f-total">Total<span>${Math.round(tot.kcal)} kcal</span></div></div>
+      <p class="hint" style="margin:6px 2px 0">Son estimaciones. Revisá y quitá lo que no corresponda antes de guardar.</p>` : ''}
+    <div class="f-manual"><input id="fm-name" placeholder="Agregar a mano: nombre" aria-label="Nombre del alimento"><input id="fm-kcal" type="number" inputmode="numeric" placeholder="kcal" aria-label="Calorías"><button type="button" class="btn btn-ghost" id="fm-add">Sumar</button></div>`;
+  $('#f-items').querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { food.items.splice(+b.dataset.rm, 1); paintFood(); });
+  $('#fm-add').onclick = () => {
+    const n = $('#fm-name').value.trim(), k = +$('#fm-kcal').value;
+    if(!n || !(k > 0 && k < 5000)){ toast('Poné el nombre y las calorías.', true); return; }
+    food.items.push({ name:n, qty:'', kcal:k, p:0, c:0, f:0 }); paintFood();
+  };
+  $('#f-save').disabled = !food.items.length || food.loading;
+}
+async function estimateNow(){
+  const text = $('#f-desc').value.trim();
+  if(!text && !food.dataUrl){ toast('Contame qué comiste o agregá una foto.', true); $('#f-desc').focus(); return; }
+  food.loading = true; paintFood();
+  try{
+    const items = await estimateFood(text, food.dataUrl);
+    if(!food) return;
+    if(!items.length) toast('No pude identificar comidas. Probá describiéndolo con palabras.', true);
+    food.items = items;
+  }catch(err){
+    toast(err.message, true);
+  }finally{
+    if(food){ food.loading = false; paintFood(); }
+  }
+}
+async function estimateFood(text, dataUrl){
+  const instr = `Estimá la información nutricional de lo que comió ${S.name}${text ? ': "' + text + '"' : ' (ver foto)'}.
+Considerá porciones caseras típicas del noroeste argentino (ej: empanada salteña de carne ≈ 90 g ≈ 200 kcal; porción de locro ≈ 350 g; humita en chala ≈ 250 g).
+Respondé SOLO JSON: {"items":[{"nombre":"Empanada salteña de carne","porcion":"2 unidades","kcal":400,"proteinas_g":18,"carbohidratos_g":40,"grasas_g":18}]}
+Un ítem por alimento distinto. Números sin unidades. Si no hay comida identificable, devolvé {"items":[]}.`;
+  let raw;
+  if(dataUrl){
+    try{
+      raw = await callGroq([{ role:'user', content:[{ type:'text', text:instr }, { type:'image_url', image_url:{ url:dataUrl } }] }], VISION_MODEL, { json:true, temperature:0.2, max_tokens:800 });
+    }catch(err){
+      if(err.kind === 'network' || !text) throw err.kind === 'network' ? err : new Error('No pude analizar la foto. Describí el plato con palabras y probá de nuevo.');
+    }
+  }
+  if(!raw) raw = await callGroq([{ role:'system', content:'Sos un nutricionista que estima calorías y macronutrientes. Respondés solo JSON válido.' }, { role:'user', content:instr }], MODEL, { json:true, temperature:0.2, max_tokens:800 });
+  let j; try{ j = JSON.parse(raw); }catch(_){ const m = raw.match(/\{[\s\S]*\}/); j = m ? JSON.parse(m[0]) : { items:[] }; }
+  const num = v => { const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) && n >= 0 ? n : 0; };
+  return (Array.isArray(j.items) ? j.items : []).map(i => ({
+    name: clean(i.nombre).slice(0, 60), qty: clean(i.porcion).slice(0, 40),
+    kcal: Math.min(4000, num(i.kcal)), p: num(i.proteinas_g), c: num(i.carbohidratos_g), f: num(i.grasas_g)
+  })).filter(i => i.name && i.kcal > 0).slice(0, 12);
+}
+function saveFood(){
+  const day = getDay(curDay || dayKey(new Date()));
+  food.items.forEach(x => {
+    day.meals.push(Object.assign({ id: Date.now().toString(36) + Math.random().toString(36).slice(2,6), meal: food.meal, ts: Date.now() }, x));
+    S.recents = [Object.assign({}, x), ...S.recents.filter(r => r.name.toLowerCase() !== x.name.toLowerCase())].slice(0, 12);
+  });
+  const n = food.items.length, kc = Math.round(food.items.reduce((a,x) => a + x.kcal, 0));
+  pruneLog(); save(); closeFood(); renderHoy();
+  toast(`Anotado: ${n} ${n === 1 ? 'ítem' : 'ítems'}, ${kc} kcal.`);
+}
+
+/* --- Exportar / importar --- */
+function exportData(){
+  const blob = new Blob([JSON.stringify(S, null, 2)], { type:'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'nutrisalta-' + dayKey(new Date()) + '.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  toast('Descargué tu copia de seguridad.');
+}
+async function importData(file){
+  if(!file) return;
+  try{
+    const j = JSON.parse(await file.text());
+    if(!j || typeof j !== 'object' || !j.name) throw new Error('formato');
+    if(!confirm(`¿Reemplazar tus datos actuales con la copia de ${j.name}?`)) return;
+    const keep = S; S = Object.assign({}, keep, j, { conditions:'artrosis' });
+    ['msgs','clinHist','weightLog','facts','recents'].forEach(k => { if(!Array.isArray(S[k])) S[k] = []; });
+    if(!S.log || typeof S.log !== 'object') S.log = {};
+    save(); location.reload();
+  }catch(e){
+    console.error('[NutriSalta] Importación fallida', e);
+    toast('Ese archivo no es una copia de NutriSalta.', true);
+  }finally{ $('#imp-file').value = ''; }
+}
+
+/* ===================== MODAL ===================== */
+function openModal(){
+  $('#m-name').value = S.name; $('#m-age').value = S.age; $('#m-goals').value = S.goals;
+  $('#m-weight').value = lastWeight() ? lastWeight().kg : ''; $('#m-height').value = S.height;
+  $('#m-sex').value = S.sex || ''; $('#m-act').value = S.activity || 'baja'; $('#m-goalw').value = S.weightGoal || '';
+  try{ $('#m-key').value = localStorage.getItem(STORE_KEY+'_key') || ''; }catch(_){}
+  $('#modal').classList.remove('hidden');
+  setTimeout(() => $('#m-name').focus(), 30);
+}
+function closeModal(){ $('#modal').classList.add('hidden'); }
+
+/* ===================== UI HELPERS ===================== */
+const $ = s => document.querySelector(s);
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function kb(n){ return n > 1048576 ? (n/1048576).toFixed(1)+' MB' : Math.max(1,Math.round(n/1024))+' KB'; }
+function fmtDate(iso){ try{ return new Date(iso).toLocaleDateString('es-AR',{day:'numeric',month:'short',year:'numeric'}); }catch(_){ return ''; } }
+function fmtTime(ts){ try{ return new Date(ts).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}); }catch(_){ return ''; } }
+let toastT;
+function toast(msg, isErr){
+  const t = $('#toast');
+  t.textContent = msg; t.classList.toggle('err', !!isErr); t.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), isErr ? 4500 : 2600);
+}
+function setBusy(b){
+  busy = b; updateSend();
+  $('#status').innerHTML = b ? '<i class="status-dot"></i>Escribiendo…' : $('#status').innerHTML;
+}
+function setStatusText(t){ $('#status').innerHTML = '<i class="status-dot"></i>' + esc(t); }
+function setStatus(ok){
+  $('#status').innerHTML = ok ? '<i class="status-dot"></i>Listo para ayudarte' : '<i class="status-dot err"></i>Sin conexión con el asistente';
+}
+function updateSend(){ $('#send').disabled = busy || (!$('#txt').value.trim() && !pending); }
+function autosize(){ const t = $('#txt'); t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 140) + 'px'; }
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.tab === name));
+  ['chat','hoy','perfil','historial'].forEach(n => $('#'+n+'-panel').classList.toggle('hidden', n !== name));
+  if(name === 'chat') scrollDown(true);
+  if(name === 'hoy'){ if(curDay !== dayKey(new Date()) && !getDay(curDay, false)) curDay = dayKey(new Date()); renderHoy(); }
+  hideTip();
+}
+
+/* ===================== ARRANQUE ===================== */
+function showApp(){
+  $('#setup').classList.add('hidden');
+  $('#app').classList.remove('hidden');
+  renderAll(); refreshPanels();
+}
+function init(){
+  load();
+
+  // Setup
+  document.querySelectorAll('#goal-chips .chip').forEach(c => c.onclick = () => {
+    const g = $('#s-goals'); const v = c.textContent.toLowerCase();
+    c.classList.toggle('on');
+    const parts = g.value.split(',').map(s=>s.trim()).filter(Boolean);
+    const i = parts.findIndex(p => p.toLowerCase() === v);
+    if(i >= 0) parts.splice(i,1); else parts.push(v);
+    g.value = parts.join(', ');
+  });
+  $('#setup-form').onsubmit = e => {
+    e.preventDefault();
+    const name = $('#s-name').value.trim(), age = $('#s-age').value.trim();
+    if(!name){ toast('Escribí tu nombre para empezar.', true); $('#s-name').focus(); return; }
+    if(!age || +age < 1 || +age > 120){ toast('Revisá la edad.', true); $('#s-age').focus(); return; }
+    if(!apiKey()){
+      const k = $('#s-key').value.trim();
+      if(!k){ toast('Pegá tu clave de Groq para poder conversar.', true); $('#s-key').focus(); return; }
+      try{ localStorage.setItem(STORE_KEY+'_key', k); }catch(_){}
+    }
+    S.name = name; S.age = age; S.goals = $('#s-goals').value.trim();
+    S.since = S.since || new Date().toISOString();
+    save(); showApp();
+  };
+
+  // Tabs
+  document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab));
+
+  // Composer
+  const txt = $('#txt');
+  txt.addEventListener('input', () => { autosize(); updateSend(); });
+  txt.addEventListener('keydown', e => {
+    if(e.key === 'Enter' && !e.shiftKey && !e.isComposing && window.matchMedia('(hover:hover)').matches){ e.preventDefault(); send(); }
+  });
+  $('#send').onclick = send;
+  $('#btn-cam').onclick = () => $('#f-img').click();
+  $('#btn-pdf').onclick = () => $('#f-pdf').click();
+  $('#f-img').onchange = e => onImage(e.target.files[0]);
+  $('#f-pdf').onchange = e => onPdf(e.target.files[0]);
+  $('#pv-remove').onclick = clearPending;
+
+  // Diario
+  $('#f-close').onclick = closeFood; $('#f-cancel').onclick = closeFood;
+  $('#food-modal').addEventListener('click', e => { if(e.target.id === 'food-modal') closeFood(); });
+  $('#f-calc').onclick = estimateNow;
+  $('#f-save').onclick = saveFood;
+  $('#f-cam').onclick = () => $('#f-file').click();
+  $('#f-photo-rm').onclick = () => { food.dataUrl = null; $('#f-file').value = ''; paintFood(); };
+  $('#f-file').onchange = async e => {
+    const f = e.target.files[0]; if(!f || !food) return;
+    try{ food.dataUrl = await shrinkImage(await readAsDataURL(f), 1024); paintFood(); }
+    catch(_){ toast('No pude leer la foto.', true); }
+  };
+  $('#imp-file').onchange = e => importData(e.target.files[0]);
+  window.addEventListener('scroll', hideTip, true);
+
+  // Modal
+  $('#btn-settings').onclick = openModal;
+  $('#m-close').onclick = closeModal;
+  $('#m-cancel').onclick = closeModal;
+  $('#modal').addEventListener('click', e => { if(e.target.id === 'modal') closeModal(); });
+  document.addEventListener('keydown', e => {
+    if(e.key !== 'Escape') return;
+    if(!$('#food-modal').classList.contains('hidden')) closeFood();
+    else if(!$('#modal').classList.contains('hidden')) closeModal();
+  });
+  $('#m-form').onsubmit = e => {
+    e.preventDefault();
+    const name = $('#m-name').value.trim(), age = $('#m-age').value.trim();
+    if(!name){ toast('El nombre no puede quedar vacío.', true); return; }
+    if(!age || +age < 1 || +age > 120){ toast('Revisá la edad.', true); return; }
+    S.name = name; S.age = age; S.goals = $('#m-goals').value.trim();
+    const wv = $('#m-weight').value.trim(), hv = $('#m-height').value.trim();
+    if(wv && !(lastWeight() && lastWeight().kg === +wv) && !addWeight(wv, 'manual')){ toast('Revisá el peso (entre 25 y 300 kg).', true); return; }
+    if(hv && !setHeight(hv)){ toast('Revisá la altura en cm (ej: 162).', true); return; }
+    if(!hv) S.height = '';
+    const gw = $('#m-goalw').value.trim();
+    if(gw && !(+gw >= 25 && +gw <= 300)){ toast('Revisá el peso objetivo.', true); return; }
+    S.weightGoal = gw; S.sex = $('#m-sex').value; S.activity = $('#m-act').value;
+    try{
+      const k = $('#m-key').value.trim();
+      if(k) localStorage.setItem(STORE_KEY+'_key', k); else localStorage.removeItem(STORE_KEY+'_key');
+    }catch(_){}
+    save(); closeModal(); refreshPanels(); renderHoy();
+    if(!S.msgs.length) renderAll();
+    toast('Datos guardados.');
+  };
+
+  if(!apiKey()) $('#s-key-wrap').classList.remove('hidden');
+  if(S.name){ showApp(); } else { $('#setup').classList.remove('hidden'); $('#s-name').focus(); }
+}
+init();
+</script>
+</body>
+</html>
