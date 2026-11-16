@@ -162,6 +162,11 @@ main{flex:1;overflow:hidden;position:relative}
 .bubble ul,.bubble ol{margin:4px 0 8px;padding-left:20px}
 .bubble li{margin:2px 0}
 .bubble h4{margin:10px 0 4px;font-size:var(--fs-md)}
+.md-table{width:100%;border-collapse:collapse;margin:2px 0 8px;font-size:var(--fs-sm)}
+.md-table th{text-align:left;font-size:var(--fs-xs);color:var(--text-3);font-weight:600;padding:4px 6px;border-bottom:1px solid var(--line)}
+.md-table td{padding:5px 6px;border-bottom:1px solid var(--line)}
+.md-table td:not(:first-child),.md-table th:not(:first-child){text-align:right;font-family:var(--mono);white-space:nowrap}
+.md-table tr:last-child td{border-bottom:0}
 .bubble strong{font-weight:650}
 .bubble .meta{display:block;margin-top:6px;font-size:11px;opacity:.65;font-family:var(--mono)}
 .att-tag{display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-xs);padding:3px 8px;border-radius:6px;background:hsl(0 0% 100% / .18);margin-bottom:6px}
@@ -619,7 +624,7 @@ const MODEL        = 'llama-3.3-70b-versatile'; // preferido; si Groq lo da de b
 // Si falla, se cae al MODEL de texto con la descripción "[El usuario envió una foto...]".
 const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
 const STORE_KEY    = 'ns_v4';
-const APP_VERSION  = '1.9 · 16 nov 2026'; // subir en cada cambio para verificar que el celular se actualizó
+const APP_VERSION  = '2.0 · 16 nov 2026'; // subir en cada cambio para verificar que el celular se actualizó
 const FORMAT_REMINDER = '(Respondé en máximo 4 líneas, una sola idea, sin listas ni tablas, como charlando. Terminá con un 👉 de una sola acción.)';
 const MAX_REPLY_CHARS = 420;
 const MAX_SAVED    = 60;   // msgs guardados
@@ -728,62 +733,66 @@ function healthContext(){
 }
 
 function systemPrompt(){
-  return `Sos NutriSalta, un asistente de nutrición cálido y cercano para personas con artrosis. Hablás de vos, como en Salta. Conocés bien la cocina del NOA: locro, humita, tamales, empanadas, charqui, quesillo, quínoa (y también mondongo, mote, api, arrope, cabrito, llama, maíz morado, papa andina, locoto). Proponés versiones más livianas de esos platos, pensadas para las articulaciones.
+  return `Sos NutriSalta, un asistente de nutrición cálido y cercano para personas con artrosis. Hablás de vos, como en Salta. Conocés bien la cocina del NOA: locro, humita, tamales, empanadas, charqui, quesillo, quínoa.
 
-Estás hablando con ${S.name}, ${S.age} años, con artrosis.
-Sus objetivos: ${S.goals || 'comer más sano y sentirse mejor'}.
+Estás hablando con ${S.name}, ${S.age} años, con artrosis. Sus objetivos: ${S.goals || 'comer más sano y sentirse mejor'}.
 
 LO QUE SABÉS DE ${S.name.toUpperCase()} (memoria persistente):
 ${healthContext()}
 
-FORMATO OBLIGATORIO:
-- Máximo 4 líneas por respuesta. Si tenés más para decir, elegí lo más importante.
-- NUNCA uses tablas ni listas largas.
-- Una sola idea por respuesta.
-- Hablá como si charlaras cara a cara, no como si escribieras un informe.
-- Cuando el usuario registra algo, confirmalo en una línea y decí si está bien o qué sumar.
-- El 👉 final tiene que ser una sola acción simple y concreta.
-
 ESTILO DE CONVERSACIÓN:
+- Respondés corto: máximo 3-4 líneas por respuesta.
+- NUNCA uses tablas ni listas largas en respuestas normales de chat.
 - Primero reconocés lo positivo, después sugerís mejoras.
 - Nunca alarmás ni asustás.
-- Usás emojis con moderación (1-2 por respuesta).
-- Cuando ${S.name} logra algo, lo celebrás genuinamente.
+- Usás un solo emoji por respuesta, con moderación.
+- Cuando ${S.name} logra algo, lo celebrás con una frase corta.
 - Si se desvía un día, lo normalizás y lo ayudás a retomar sin culpa.
 
+FORMATO OBLIGATORIO:
+- Hablás como si charlaras cara a cara, no como si escribieras un informe.
+- Una sola idea o sugerencia por respuesta.
+- El 👉 final tiene que ser UNA acción simple y concreta.
+- Sin tablas, sin listas de 5 puntos, sin subtítulos.
+
 CUANDO REGISTRA COMIDAS O FOTOS:
-- Si dice que comió o está comiendo algo, o manda la foto de su plato, lo anotás en su diario (ver DATOS PARA GUARDAR).
-- En una línea confirmás lo que anotaste y cuánto lleva hoy ("con esto llevás X de Y kcal").
-- En otra, si está bien encaminado o qué podría sumar.
+- Si dice que comió o está comiendo algo, o manda la foto de su plato, lo anotás (ver DATOS PARA GUARDAR).
+- Confirmás en una línea lo que anotaste.
+- La app agrega sola debajo el resumen "📊 Hoy: … kcal | 💪 Proteína: …g / meta …g" con los números reales del diario: no lo escribas vos.
+- Una sola sugerencia si algo falta.
+- Terminás con 👉 y una acción concreta.
 - No anotás preguntas ("¿puedo comer…?"), planes ("mañana voy a…") ni algo que ya figure en lo que comió hoy.
 
-CUANDO SUBE UN PDF DE ANÁLISIS (también máximo 4 líneas):
-- Contás en simple lo más importante: cuántos valores están bien y el que más atención necesita, con calma y qué comida ayuda.
-- Si mejoró respecto al análisis anterior, eso va primero y lo celebrás.
-- Si un valor está fuera de rango, sugerís comentarlo con su médico en el próximo control, sin dramatizar.
-- La tabla completa queda en la pestaña Historial; si quiere el detalle de otro valor, te lo pregunta.
+RESUMEN DIARIO (cuando lo pide):
+- La app muestra sola la tabla por comida (kcal y proteína) y si llegó a la meta, con los números reales del diario.
+- Vos sumás solo una frase corta de ánimo y el 👉. No repitas la tabla ni los números.
+
+CUANDO SUBE UN PDF DE ANÁLISIS:
+- Explicás cada valor fuera de rango en lenguaje simple, sin tecnicismos.
+- Máximo 3 valores por respuesta; si hay más, preguntás cuál le interesa.
+- No diagnosticás ni recetás medicamentos.
+- Nunca mencionás cáncer, tumores ni enfermedades terminales.
+- Terminás siempre con 👉 y un consejo concreto de alimentación.
 
 MEMORIA:
-- Usás lo que ${S.name} te fue contando para personalizar cada respuesta, sin repetir números a cada rato.
-- Si mejoró algo respecto a antes (peso, un análisis, el agua, el dolor), lo mencionás.
+- Usás lo que ${S.name} te fue contando para personalizar cada respuesta.
+- Si mejoró algo respecto a antes, lo mencionás brevemente.
+- Guardás en silencio: peso, altura, objetivos y lo que cuenta sobre su rutina (ver DATOS PARA GUARDAR).
 
 LÍMITES:
-- Solo hablás de alimentación, nutrición, recetas, hidratación, ejercicio suave y bienestar. Si te preguntan otra cosa, volvés con amabilidad a esos temas.
+- Solo hablás de alimentación, nutrición, recetas, hidratación, ejercicio suave y bienestar.
 - Podés mencionar: glucosa, colesterol, triglicéridos, hemoglobina, insulina, presión arterial, ácido úrico, tiroides, diabetes, hipertensión, anemia, osteoporosis.
-- No diagnosticás enfermedades ni recetás medicamentos.
-- Nunca mencionás cáncer, tumores, nada maligno, leucemia, linfoma, metástasis ni enfermedades terminales. Si un análisis trae marcadores de ese tipo, los ignorás por completo.
+- No diagnosticás enfermedades.
+- Nunca mencionás cáncer, tumores ni enfermedades terminales. Si un análisis trae marcadores de ese tipo, los ignorás.
 
-CIERRE:
-- Siempre terminás con algo concreto que empiece con 👉
-
-DATOS PARA GUARDAR (invisible para el usuario, después del 👉):
-- Si dice su peso, agregá una línea exacta: [[PESO: 78.5]]
-- Si dice su altura: [[ALTURA: 165]] (en cm)
-- Si cuenta un dato durable útil para su alimentación (alergia, intolerancia, comida que no le gusta, rutina, si vive solo, medicación, actividad física): [[DATO: frase corta en tercera persona]]
-- Por cada alimento que comió, una línea: [[COMIDA: nombre | porción | kcal | proteínas g | carbohidratos g | grasas g | momento]]
+DATOS PARA GUARDAR (invisible para el usuario, al final, después del 👉):
+- Peso: [[PESO: 78.5]]
+- Altura: [[ALTURA: 165]] (en cm)
+- Un objetivo nuevo que cuente: [[OBJETIVO: frase corta]]
+- Un dato durable de su rutina o alimentación (alergia, intolerancia, gustos, horarios, si vive solo, medicación, actividad): [[DATO: frase corta en tercera persona]]
+- Por cada alimento que comió: [[COMIDA: nombre | porción | kcal | proteínas g | carbohidratos g | grasas g | momento]]
   Ejemplo: [[COMIDA: Empanada salteña de carne | 2 unidades | 400 | 18 | 40 | 18 | almuerzo]]
-  momento = desayuno, almuerzo, merienda, cena o colacion. Si no lo dice, usá el que corresponde a la hora: ${mealByHour()} (son las ${new Date().toLocaleTimeString('es-AR', { hour:'2-digit', minute:'2-digit' })}).
-  Números sin unidades, con porciones caseras típicas del NOA.
+  momento = desayuno, almuerzo, merienda, cena o colacion. Si no lo dice, usá ${mealByHour()} (son las ${new Date().toLocaleTimeString('es-AR', { hour:'2-digit', minute:'2-digit' })}). Números sin unidades, porciones caseras del NOA.
 - Solo datos nuevos que no estén ya arriba. Si no hay nada nuevo, no agregues ninguna de estas líneas.`;
 }
 
@@ -816,6 +825,15 @@ function setHeight(cm){
   if(cm > 0 && cm < 3) cm = cm * 100;          // "1,65" → 165
   if(!(cm >= 100 && cm <= 230)) return false;
   S.height = String(Math.round(cm));
+  return true;
+}
+function addGoal(t){
+  t = clean(t).replace(/\.$/, '');
+  if(!t || t.length > 120 || FORBIDDEN.test(t)) return false;
+  const cur = S.goals ? S.goals.split(/,\s*/).map(x => x.trim()).filter(Boolean) : [];
+  if(cur.some(g => g.toLowerCase() === t.toLowerCase())) return false;
+  cur.push(t);
+  S.goals = cur.join(', ').slice(0, 400);
   return true;
 }
 function addFact(t){
@@ -860,12 +878,13 @@ function detectFromText(text){
 function absorbMemory(reply){
   const found = [];
   const foods = [];
-  const body = reply.replace(/\[\[\s*(PESO|ALTURA|DATO|COMIDA)\s*:\s*([^\]]+?)\s*\]\]/gi, (_, k, v) => {
+  const body = reply.replace(/\[\[\s*(PESO|ALTURA|DATO|COMIDA|OBJETIVO)\s*:\s*([^\]]+?)\s*\]\]/gi, (_, k, v) => {
     k = k.toUpperCase();
     if(k === 'COMIDA'){ const f = parseFoodTag(v); if(f) foods.push(f); return ''; }
     if(k === 'PESO'   && addWeight(v.replace(/[^\d.,]/g,''), 'chat')) found.push('peso ' + lastWeight().kg + ' kg');
     if(k === 'ALTURA' && setHeight(v.replace(/[^\d.,]/g,''))) found.push('altura ' + S.height + ' cm');
     if(k === 'DATO'   && addFact(v)) found.push(v.length > 40 ? v.slice(0,40) + '…' : v);
+    if(k === 'OBJETIVO' && addGoal(v)) found.push('objetivo: ' + clean(v).slice(0, 40));
     return '';
   }).replace(/\n{3,}/g, '\n\n').trim();
   const logged = logFoods(foods);
@@ -875,6 +894,29 @@ function absorbMemory(reply){
     found.push(`${meals} (${logged.length} ${logged.length === 1 ? 'ítem' : 'ítems'}, ${kc} kcal)`);
   }
   return { body, found, logged };
+}
+
+/* --- Resúmenes con los números reales del diario --- */
+const isSummaryRequest = t => /resumen|c[oó]mo (voy|vengo|estoy|va mi d[ií]a)|cu[aá]nto (llevo|com[ií])|total (del|de hoy|del d[ií]a)|balance del d[ií]a/i.test(t);
+function todayLine(){
+  const t = dayTotals(getDay(dayKey(new Date()), false)), T = targets();
+  return `📊 Hoy: ${t.kcal.toLocaleString('es-AR')} kcal | 💪 Proteína: ${t.p}g / meta ${T.p}g`;
+}
+function dailySummary(){
+  const d = getDay(dayKey(new Date()), false), T = targets();
+  if(!d || !d.meals.length) return 'Todavía no anotaste comidas hoy.';
+  const rows = MEALS.filter(m => m.id !== 'colacion' || d.meals.some(x => x.meal === 'colacion')).map(m => {
+    const it = d.meals.filter(x => x.meal === m.id);
+    const k = Math.round(it.reduce((a, x) => a + (+x.kcal || 0), 0)), pr = Math.round(it.reduce((a, x) => a + (+x.p || 0), 0));
+    return `| ${m.name} | ${it.length ? k.toLocaleString('es-AR') + ' kcal' : '—'} | ${it.length ? pr + 'g' : '—'} |`;
+  });
+  const t = dayTotals(d);
+  const kcalOk = t.kcal >= T.kcal * 0.9 && t.kcal <= T.kcal * 1.1, protOk = t.p >= T.p;
+  const meta = protOk && kcalOk ? '✅ Llegaste a tu meta de hoy.'
+    : t.kcal > T.kcal * 1.1 ? `Pasaste tu meta por ${(t.kcal - T.kcal).toLocaleString('es-AR')} kcal${protOk ? ' (la proteína, ✅)' : ''}.`
+    : `Te faltan ${Math.max(0, T.kcal - t.kcal).toLocaleString('es-AR')} kcal${protOk ? ' (la proteína ya está ✅)' : ' y ' + (T.p - t.p) + 'g de proteína'} para tu meta.`;
+  return ['| Comida | Kcal | Proteína |', '|--------|------|----------|', ...rows,
+    `| **Total** | **${t.kcal.toLocaleString('es-AR')} kcal** | **${t.p}g** |`, '', meta].join('\n');
 }
 
 /* --- Formato obligatorio: máximo 4 líneas, sin tablas ni listas, 👉 de una sola acción ---
@@ -1185,6 +1227,10 @@ async function send(){
     const reply = r.text, engine = r.engine;
     const mem = absorbMemory(reply);
     mem.body = enforceFormat(mem.body);
+    // Lo que calcula la app con el diario real (va después del recorte de formato)
+    if(text && isSummaryRequest(text)) mem.body = dailySummary() + '\n\n' + mem.body;
+    else if(mem.logged && mem.logged.length) mem.body = mem.body.replace(/\n?(👉[^\n]*)$/u, '\n' + todayLine() + '\n$1') || mem.body;
+    if(mem.logged && mem.logged.length && !mem.body.includes('📊')) mem.body += '\n' + todayLine();
     typingRow.remove();
     const botMsg = { role:'assistant', content:mem.body, ts:Date.now() };
     if(engine !== 'groq') botMsg.engine = engine;
@@ -1586,10 +1632,25 @@ function md(src){
     .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
     .replace(/(^|[^*])\*(?!\s)(.+?)\*(?!\*)/g,'$1<em>$2</em>')
     .replace(/`([^`]+)`/g,'<code>$1</code>');
-  const close = () => { if(list){ html += `</${list}>`; list = null; } };
+  let table = null;
+  const closeTable = () => {
+    if(!table) return;
+    const [head, ...body] = table;
+    html += '<table class="md-table"><thead><tr>' + head.map(c => `<th>${inline(c)}</th>`).join('') + '</tr></thead><tbody>' +
+      body.map(r => '<tr>' + r.map(c => `<td>${inline(c)}</td>`).join('') + '</tr>').join('') + '</tbody></table>';
+    table = null;
+  };
+  const close = () => { closeTable(); if(list){ html += `</${list}>`; list = null; } };
   for(const raw of lines){
     const l = raw.trim();
     let m;
+    if(/^\|.*\|$/.test(l)){
+      if(list){ html += `</${list}>`; list = null; }
+      if(/^\|[\s:|-]+\|$/.test(l)) continue;            // fila separadora
+      (table = table || []).push(l.slice(1, -1).split('|').map(c => c.trim()));
+      continue;
+    }
+    closeTable();
     if(!l){ close(); continue; }
     if((m = l.match(/^#{1,6}\s+(.*)/))){ close(); html += `<h4>${inline(m[1])}</h4>`; continue; }
     if((m = l.match(/^[-*•]\s+(.*)/))){ if(list!=='ul'){ close(); html+='<ul>'; list='ul'; } html += `<li>${inline(m[1])}</li>`; continue; }
