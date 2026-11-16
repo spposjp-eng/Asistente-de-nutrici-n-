@@ -515,6 +515,11 @@ details.adv .field{margin-top:10px}
           <input id="m-key" type="password" autocomplete="off" placeholder="gsk_…">
           <span class="hint">Reemplaza la clave actual. Se guarda solo en este navegador.</span>
         </div>
+        <div class="field">
+          <label for="m-model">Modelo de IA</label>
+          <select id="m-model"><option value="">Automático (recomendado)</option></select>
+          <span class="hint" id="m-model-hint">Se elige solo entre los que tiene tu cuenta de Groq.</span>
+        </div>
       </details>
     </div>
     <footer>
@@ -569,7 +574,7 @@ const GROQ_URL     = 'https://api.groq.com/openai/v1/chat/completions';
 // La clave NO se sube al repo (GitHub la bloquea). Pegala acá en tu copia local,
 // o cargala una vez en la pantalla inicial / Mis datos → Conexión avanzada.
 const KEY          = '';
-const MODEL        = 'llama-3.3-70b-versatile';
+const MODEL        = 'llama-3.3-70b-versatile'; // preferido; si Groq lo da de baja se elige otro solo
 // Modelo con visión de Groq, para que la foto se analice de verdad.
 // Si falla, se cae al MODEL de texto con la descripción "[El usuario envió una foto...]".
 const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
@@ -859,7 +864,86 @@ function studyAsText(st){
 }
 
 /* ===================== LLAMADA A GROQ ===================== */
+/* --- Elección automática de modelo ---
+   Groq da de baja modelos seguido. En vez de depender de un nombre fijo,
+   consulto /models con la clave y elijo el mejor disponible según estas listas. */
+const MODELS_URL = 'https://api.groq.com/openai/v1/models';
+const TEXT_PREFS = [
+  'llama-3.3-70b-versatile', 'openai/gpt-oss-120b', 'moonshotai/kimi-k2-instruct-0905', 'moonshotai/kimi-k2-instruct',
+  'meta-llama/llama-4-maverick-17b-128e-instruct', 'qwen/qwen3-32b', 'openai/gpt-oss-20b',
+  'meta-llama/llama-4-scout-17b-16e-instruct', 'llama-3.1-8b-instant'
+];
+const VISION_PREFS = ['meta-llama/llama-4-scout-17b-16e-instruct', 'meta-llama/llama-4-maverick-17b-128e-instruct'];
+const NOT_CHAT = /whisper|tts|guard|playai|orpheus|compound|distil|embed|speech|audio/i;
+let modelsCache = null; // {ids:[], ts}
+const badModels = new Set();
+
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(_){ return null; } }
+function lsSet(k, v){ try{ v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); }catch(_){} }
+
+async function listModels(force){
+  if(!force && modelsCache && Date.now() - modelsCache.ts < 6*3600e3) return modelsCache.ids;
+  if(!force){
+    try{ const c = JSON.parse(lsGet(STORE_KEY + '_models') || 'null'); if(c && Date.now() - c.ts < 24*3600e3){ modelsCache = c; return c.ids; } }catch(_){}
+  }
+  let res;
+  try{ res = await fetch(MODELS_URL, { headers:{ 'Authorization':'Bearer ' + apiKey(), 'Content-Type':'application/json' } }); }
+  catch(netErr){ console.error('[NutriSalta] Error de RED al listar modelos:', netErr); return modelsCache ? modelsCache.ids : []; }
+  if(!res.ok){
+    let t = ''; try{ t = await res.text(); }catch(_){}
+    console.error('[NutriSalta] /models respondió HTTP ' + res.status + ':', t);
+    return modelsCache ? modelsCache.ids : [];
+  }
+  try{
+    const j = await res.json();
+    const ids = (j.data || []).filter(m => m.active !== false && !NOT_CHAT.test(m.id)).map(m => m.id);
+    modelsCache = { ids, ts: Date.now() };
+    lsSet(STORE_KEY + '_models', JSON.stringify(modelsCache));
+    console.info('[NutriSalta] Modelos disponibles:', ids);
+    return ids;
+  }catch(e){ return []; }
+}
+function pickFrom(ids, prefs, fallbackRe){
+  const ok = id => !badModels.has(id);
+  for(const p of prefs) if(ids.includes(p) && ok(p)) return p;
+  const any = ids.find(id => ok(id) && (!fallbackRe || fallbackRe.test(id)));
+  return any || null;
+}
+// kind: 'text' | 'vision'. Devuelve el id de modelo a usar (o null si no hay de visión).
+async function resolveModel(kind){
+  const manual = lsGet(STORE_KEY + '_model');
+  if(kind === 'text' && manual && !badModels.has(manual)) return manual;
+  const ids = await listModels(false);
+  if(!ids.length){ // no pude listar: uso los nombres por defecto
+    const d = kind === 'vision' ? VISION_MODEL : MODEL;
+    return badModels.has(d) ? null : d;
+  }
+  return kind === 'vision'
+    ? pickFrom(ids, VISION_PREFS, /vision|llama-4|-vl\b|scout|maverick/i)
+    : pickFrom(ids, TEXT_PREFS, /llama|gpt-oss|qwen|kimi|mistral|gemma|deepseek/i) || ids[0];
+}
+const isModelGone = e => e.kind === 'http' && (e.status === 404 || e.status === 400) && /model|decommission|does not exist|not found/i.test(e.detail || '');
+
 async function callGroq(messages, model, opts){
+  const kind = model === VISION_MODEL ? 'vision' : 'text';
+  for(let attempt = 0; attempt < 3; attempt++){
+    const real = await resolveModel(kind);
+    if(!real){ const e = new Error('Tu cuenta de Groq no tiene un modelo que pueda ver fotos.'); e.kind = 'nomodel'; throw e; }
+    try{
+      return await callGroqRaw(messages, real, opts);
+    }catch(e){
+      if(!isModelGone(e)) throw e;
+      console.warn('[NutriSalta] El modelo "' + real + '" no está disponible, busco otro.', e.detail);
+      badModels.add(real);
+      if(lsGet(STORE_KEY + '_model') === real) lsSet(STORE_KEY + '_model', null);
+      await listModels(true);
+    }
+  }
+  const e = new Error('No encontré un modelo disponible en tu cuenta de Groq. Revisá la clave en Mis datos → Conexión avanzada.');
+  e.kind = 'nomodel'; throw e;
+}
+
+async function callGroqRaw(messages, model, opts){
   opts = opts || {};
   const body = { model, messages, temperature: opts.temperature ?? 0.6, max_tokens: opts.max_tokens || 1024 };
   if(opts.json) body.response_format = { type: 'json_object' };
@@ -903,13 +987,14 @@ async function callGroq(messages, model, opts){
     console.error('[NutriSalta] Respuesta sin contenido:', data);
     const e = new Error('No recibí respuesta del asistente. Probá de nuevo.'); e.kind='empty'; throw e;
   }
-  return out.trim();
+  return out.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 }
 function httpMessage(status, detail){
   if(status === 401) return 'La clave de Groq no es válida o fue revocada (401). Cargá una nueva en Mis datos → Conexión avanzada.';
   if(status === 429) return 'Demasiadas consultas seguidas (429). Esperá un minuto y volvé a intentar.';
   if(status === 413) return 'El mensaje es demasiado largo (413). Probá con un PDF más corto.';
   if(status >= 500)  return 'Groq está con problemas (' + status + '). Probá en un rato.';
+  if(status === 404)  return 'Groq no encontró lo pedido (404)' + (detail ? ': ' + detail : '');
   return 'Error ' + status + (detail ? ': ' + detail : '');
 }
 
@@ -1712,12 +1797,22 @@ async function importData(file){
   }finally{ $('#imp-file').value = ''; }
 }
 
+async function fillModelSelect(){
+  const sel = $('#m-model'), manual = lsGet(STORE_KEY + '_model') || '';
+  const ids = await listModels(false);
+  sel.innerHTML = '<option value="">Automático (recomendado)</option>' + ids.map(id => `<option value="${esc(id)}">${esc(id)}</option>`).join('');
+  sel.value = ids.includes(manual) ? manual : '';
+  const auto = await resolveModel('text');
+  $('#m-model-hint').textContent = ids.length ? 'En uso ahora: ' + (manual || auto) : 'No pude consultar los modelos de tu cuenta. Se usa ' + MODEL + '.';
+}
+
 /* ===================== MODAL ===================== */
 function openModal(){
   $('#m-name').value = S.name; $('#m-age').value = S.age; $('#m-goals').value = S.goals;
   $('#m-weight').value = lastWeight() ? lastWeight().kg : ''; $('#m-height').value = S.height;
   $('#m-sex').value = S.sex || ''; $('#m-act').value = S.activity || 'baja'; $('#m-goalw').value = S.weightGoal || '';
   try{ $('#m-key').value = localStorage.getItem(STORE_KEY+'_key') || ''; }catch(_){}
+  fillModelSelect();
   $('#modal').classList.remove('hidden');
   setTimeout(() => $('#m-name').focus(), 30);
 }
@@ -1842,7 +1937,11 @@ function init(){
     S.weightGoal = gw; S.sex = $('#m-sex').value; S.activity = $('#m-act').value;
     try{
       const k = $('#m-key').value.trim();
+      const prevKey = localStorage.getItem(STORE_KEY+'_key') || '';
       if(k) localStorage.setItem(STORE_KEY+'_key', k); else localStorage.removeItem(STORE_KEY+'_key');
+      if(k !== prevKey){ localStorage.removeItem(STORE_KEY+'_models'); modelsCache = null; badModels.clear(); }
+      const mv = $('#m-model').value;
+      if(mv) localStorage.setItem(STORE_KEY+'_model', mv); else localStorage.removeItem(STORE_KEY+'_model');
     }catch(_){}
     save(); closeModal(); refreshPanels(); renderHoy();
     if(!S.msgs.length) renderAll();
