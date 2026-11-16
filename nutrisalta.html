@@ -380,6 +380,18 @@ main{flex:1;overflow:hidden;position:relative}
 .prog i{display:block;height:100%;background:var(--brand);width:0;transition:width .2s}
 .offline-note{font-size:var(--fs-xs);color:var(--text-3);font-style:italic;display:block;margin-bottom:6px}
 
+/* ---------- Charlas por día ---------- */
+.day-head{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:var(--fs-xs);color:var(--text-3);padding:0 2px 4px;border-bottom:1px solid var(--line);margin-bottom:4px}
+.day-head span:first-letter{text-transform:uppercase}
+.day-head .link{font-size:var(--fs-xs)}
+.conv-item{cursor:pointer}
+.conv-item:hover{background:var(--surface-2)}
+.conv-item .body b:first-letter{text-transform:uppercase}
+.conv-view{max-width:560px}
+.conv-list{display:flex;flex-direction:column;gap:12px;padding-bottom:16px}
+.conv-view .ask-chips,.conv-view .bot-actions button,.conv-view .bot-actions .link{display:none}
+#conv-title:first-letter{text-transform:uppercase}
+
 /* ---------- Modal ---------- */
 .overlay{position:fixed;inset:0;background:hsl(0 0% 0% / .4);display:grid;place-items:center;padding:16px;z-index:50}
 .modal{width:100%;max-width:440px;background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--shadow);max-height:90vh;overflow:auto}
@@ -580,6 +592,19 @@ details.adv .field{margin-top:10px}
   </form>
 </div>
 
+<!-- ================= MODAL CHARLA ARCHIVADA ================= -->
+<div class="overlay hidden" id="conv-modal" role="dialog" aria-modal="true" aria-labelledby="conv-title">
+  <div class="modal conv-view">
+    <header>
+      <h3 id="conv-title">Charla</h3>
+      <button type="button" class="icon-btn" id="conv-close" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </header>
+    <div class="m-body"><div id="conv-list" class="conv-list"></div></div>
+  </div>
+</div>
+
 <!-- ================= MODAL COMIDA ================= -->
 <div class="overlay hidden" id="food-modal" role="dialog" aria-modal="true" aria-labelledby="f-title">
   <div class="modal">
@@ -631,10 +656,10 @@ const MODEL        = 'llama-3.3-70b-versatile'; // preferido; si Groq lo da de b
 // Si falla, se cae al MODEL de texto con la descripción "[El usuario envió una foto...]".
 const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
 const STORE_KEY    = 'ns_v4';
-const APP_VERSION  = '2.3 · 16 nov 2026'; // subir en cada cambio para verificar que el celular se actualizó
+const APP_VERSION  = '2.4 · 16 nov 2026'; // subir en cada cambio para verificar que el celular se actualizó
 const FORMAT_REMINDER = '(Respondé de vos, como en Salta (probá, sumá, acompañá; nunca "añade" ni "prueba"), en máximo 4 líneas, una sola idea, sin listas ni tablas. Terminá con un 👉 de una sola acción.)';
 const MAX_REPLY_CHARS = 420;
-const MAX_SAVED    = 60;   // msgs guardados
+const MAX_SAVED    = 200;  // msgs guardados de la charla de HOY (los días anteriores se archivan)
 const CTX_MSGS     = 14;   // msgs enviados como contexto
 const MAX_PDF_CHARS= 9000; // recorte del texto del PDF para no pasarnos de tokens
 
@@ -655,7 +680,8 @@ let S = {
   // Diario
   sex:'', activity:'baja', weightGoal:'',
   log:{},           // {'YYYY-MM-DD': {meals:[{id,meal,name,qty,kcal,p,c,f,ts}], water:ml, feel:{pain,mood,sleep}}}
-  recents:[]        // últimas comidas para re-agregar con un toque
+  recents:[],       // últimas comidas para re-agregar con un toque
+  convIndex:[]      // charlas archivadas por día: [{day, n, summary, pending}] (los mensajes van a IndexedDB)
 };
 let pending = null;   // adjunto en preview: {type:'img'|'pdf', name, dataUrl?, text?, pages?, size}
 let busy = false;
@@ -667,7 +693,7 @@ function load(){
   }catch(e){ console.warn('[NutriSalta] No se pudo leer localStorage', e); }
   S.conditions = 'artrosis'; // hardcodeada siempre
   if(!S.log || typeof S.log !== 'object') S.log = {};
-  ['msgs','clinHist','weightLog','facts','recents'].forEach(k => { if(!Array.isArray(S[k])) S[k] = []; });
+  ['msgs','clinHist','weightLog','facts','recents','convIndex'].forEach(k => { if(!Array.isArray(S[k])) S[k] = []; });
 }
 function save(){
   S.msgs = S.msgs.slice(-MAX_SAVED);
@@ -732,6 +758,11 @@ function healthContext(){
   if(wk.logged) out.push(`Últimos 7 días: registró comidas ${wk.logged} días, promedio ${wk.kcal} kcal${wk.pain != null ? ', dolor articular promedio ' + wk.pain + '/10' : ''}${wk.sleep ? ', sueño promedio ' + wk.sleep + ' h' : ''}${wk.water ? ', agua promedio ' + wk.water + ' L' : ''}.`);
   if(S.weightGoal) out.push(`Peso objetivo: ${S.weightGoal} kg.`);
 
+  const prevConvs = S.convIndex.filter(c => c.summary).slice(0, 5);
+  if(prevConvs.length){
+    out.push('\nCharlas de días anteriores (resumen):');
+    prevConvs.forEach(c => out.push(`- ${fmtDate(keyToDate(c.day))}: ${c.summary}`));
+  }
   if(S.facts.length){
     out.push('\nOtras cosas que te contó:');
     S.facts.slice(-25).forEach(f => out.push('- ' + f.t));
@@ -1345,6 +1376,7 @@ function httpMessage(status, detail){
 /* ===================== ENVIAR MENSAJE ===================== */
 async function send(){
   if(busy) return;
+  if(await rollover()) renderAll();
   const txtEl = $('#txt');
   const text = txtEl.value.trim();
   const att = pending;
@@ -1773,12 +1805,19 @@ const ICON_PDF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 function renderAll(){
   const list = $('#msg-list');
   list.innerHTML = '';
+  const head = document.createElement('div');
+  head.className = 'day-head';
+  head.innerHTML = `<span>Hoy · ${esc(new Date().toLocaleDateString('es-AR', { weekday:'long', day:'numeric', month:'long' }))}</span>` +
+    (S.convIndex.length ? `<button class="link" id="see-prev">Ver charlas anteriores</button>` : '');
+  list.appendChild(head);
+  const sp = head.querySelector('#see-prev');
+  if(sp) sp.onclick = () => { switchTab('historial'); setTimeout(() => { const t = $('#convs-title'); if(t) t.scrollIntoView({ behavior:'smooth' }); }, 60); };
   if(!S.msgs.length){ list.appendChild(emptyState()); return; }
   S.msgs.forEach(m => renderMsg(m, null, true));
   scrollDown(true);
 }
-function renderMsg(m, imgUrl, noScroll){
-  const list = $('#msg-list');
+function renderMsg(m, imgUrl, noScroll, target){
+  const list = target || $('#msg-list');
   const empty = list.querySelector('.empty'); if(empty) empty.remove();
   const row = document.createElement('div');
   row.className = 'row ' + (m.role === 'user' ? 'user' : 'bot');
@@ -1818,7 +1857,7 @@ function renderMsg(m, imgUrl, noScroll){
   const lb = row.querySelector('[data-logimg]');
   if(lb) lb.onclick = () => { const c = imgCache[m.ts]; openFood({ dataUrl:c.dataUrl, text:c.text, auto:true }); };
   list.appendChild(row);
-  if(!noScroll) scrollDown();
+  if(!noScroll && !target) scrollDown();
 }
 function renderError(text){
   const row = document.createElement('div');
@@ -1936,7 +1975,7 @@ function renderPerfil(){
     </div>
     <div class="actions">
       <button class="btn btn-ghost" id="p-edit">Editar mis datos</button>
-      <button class="btn btn-ghost" id="p-clear">Borrar conversación</button>
+      <button class="btn btn-ghost" id="p-clear">Borrar la charla de hoy</button>
       <button class="btn btn-danger" id="p-reset">Empezar de cero</button>
     </div>
     <h2 class="sec-title">Instalar y usar sin internet</h2>
@@ -1957,13 +1996,14 @@ function renderPerfil(){
   });
   $('#p-edit').onclick = openModal;
   $('#p-clear').onclick = () => {
-    if(!confirm('¿Borrar la conversación? Tus datos, medidas y estudios se mantienen.')) return;
-    S.msgs = []; save(); renderAll(); toast('Conversación borrada.');
+    if(!confirm('¿Borrar la charla de hoy? Las de días anteriores, tus datos, medidas y estudios se mantienen.')) return;
+    S.msgs = []; save(); renderAll(); toast('Charla de hoy borrada.');
   };
   $('#p-reset').onclick = () => {
     if(!confirm('Esto borra todos tus datos, la conversación y el historial. ¿Seguimos?')) return;
-    try{ localStorage.removeItem(STORE_KEY); }catch(_){}
-    location.reload();
+    try{ localStorage.removeItem(STORE_KEY); localStorage.removeItem(LS_CONVS); }catch(_){}
+    try{ indexedDB.deleteDatabase(IDB_NAME); }catch(_){}
+    setTimeout(() => location.reload(), 150);
   };
 }
 function renderHistorial(){
@@ -2010,8 +2050,21 @@ function renderHistorial(){
     <h2 class="sec-title">Historial clínico · ${studies.length} ${studies.length===1?'estudio':'estudios'}</h2>
     <div class="study-list">${list}</div>
     <p class="hint" style="margin:8px 2px 0">Se arma solo con los PDFs que subís. NutriSalta usa los últimos valores de cada estudio en todas sus respuestas.</p>
+    <h2 class="sec-title" id="convs-title">Conversaciones · ${S.convIndex.length} ${S.convIndex.length === 1 ? 'día' : 'días'}</h2>
+    <div class="card">${S.convIndex.length ? `<ul class="timeline">${S.convIndex.slice(0, 120).map(c => `
+        <li class="conv-item" data-conv="${c.day}" tabindex="0" role="button">
+          <div class="ico" style="background:var(--surface-2);color:var(--text-2)">${keyToDate(c.day).getDate()}</div>
+          <div class="body"><b>${esc(keyToDate(c.day).toLocaleDateString('es-AR', { weekday:'long', day:'numeric', month:'long' }))}</b>
+            <span>${c.n} mensajes</span>
+            <p>${c.summary ? esc(c.summary) : '<i>Resumen pendiente</i>'}</p></div>
+        </li>`).join('')}</ul>`
+      : `<div class="blank"><b>Todavía no hay charlas archivadas</b>Cada día arranca una conversación nueva; las de días anteriores aparecen acá.</div>`}</div>
     <h2 class="sec-title">Platos analizados</h2>
     <div class="card">${photoList}</div>`;
+  $('#historial-body').querySelectorAll('[data-conv]').forEach(li => {
+    li.onclick = () => openConv(li.dataset.conv);
+    li.onkeydown = e => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); openConv(li.dataset.conv); } };
+  });
   $('#historial-body').querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
     const h = S.clinHist[+b.dataset.del];
     if(!confirm(`¿Quitar "${h.kind || h.name}" del historial? Dejo de usar esos valores.`)) return;
@@ -2019,6 +2072,107 @@ function renderHistorial(){
   });
 }
 function refreshPanels(){ renderPerfil(); renderHistorial(); renderHoy(); }
+
+/* ===================== CONVERSACIONES POR DÍA =====================
+   Cada día arranca una charla nueva. Las de días anteriores se guardan en la memoria
+   del teléfono (IndexedDB, mucho más espacio que localStorage) y se resumen con IA,
+   para que el asistente siga teniendo el contexto. */
+const IDB_NAME = 'nutrisalta', IDB_STORE = 'convs', LS_CONVS = STORE_KEY + '_convs';
+let idbP = null;
+function idb(){
+  if(!idbP) idbP = new Promise((ok, fail) => {
+    try{
+      const r = indexedDB.open(IDB_NAME, 1);
+      r.onupgradeneeded = () => r.result.createObjectStore(IDB_STORE, { keyPath:'day' });
+      r.onsuccess = () => ok(r.result); r.onerror = () => fail(r.error);
+    }catch(e){ fail(e); }
+  });
+  return idbP;
+}
+const idbReq = (mode, fn) => idb().then(db => new Promise((ok, fail) => {
+  const tx = db.transaction(IDB_STORE, mode); const req = fn(tx.objectStore(IDB_STORE));
+  tx.oncomplete = () => ok(req && req.result); tx.onerror = () => fail(tx.error);
+}));
+// Si IndexedDB no está disponible (modo privado), guardo los últimos 30 días en localStorage
+const lsConvs = () => { try{ return JSON.parse(localStorage.getItem(LS_CONVS) || '[]'); }catch(_){ return []; } };
+async function convPut(rec){
+  try{ await idbReq('readwrite', st => st.put(rec)); }
+  catch(_){ const a = lsConvs().filter(c => c.day !== rec.day); a.push(rec); a.sort((x, y) => y.day.localeCompare(x.day)); localStorage.setItem(LS_CONVS, JSON.stringify(a.slice(0, 30))); }
+}
+async function convGet(day){
+  try{ return await idbReq('readonly', st => st.get(day)); }
+  catch(_){ return lsConvs().find(c => c.day === day); }
+}
+async function convAll(){
+  try{ return (await idbReq('readonly', st => st.getAll())) || []; }
+  catch(_){ return lsConvs(); }
+}
+const slimMsg = m => ({ role:m.role, ts:m.ts, att:m.att || null, engine:m.engine || null,
+  content: m.role === 'user' ? String(m.shown != null ? m.shown : m.content).slice(0, 2000) : String(m.content).slice(0, 4000),
+  logged: m.logged ? m.logged.map(l => ({ meal:l.meal, kcal:l.kcal, name:l.name })) : undefined });
+
+let rolling = false;
+// Pasa a archivo los mensajes de días anteriores. Devuelve true si cambió la charla de hoy.
+async function rollover(){
+  if(rolling) return false;
+  const today = dayKey(new Date());
+  const old = S.msgs.filter(m => dayKey(m.ts) !== today);
+  if(!old.length) return false;
+  rolling = true;
+  try{
+    const byDay = {};
+    old.forEach(m => { const k = dayKey(m.ts); (byDay[k] = byDay[k] || []).push(slimMsg(m)); });
+    for(const [day, msgs] of Object.entries(byDay)){
+      const prev = await convGet(day);
+      const all = (prev && prev.msgs ? prev.msgs : []).concat(msgs);
+      await convPut({ day, msgs: all, summary: prev && prev.summary || '' });
+      const idx = S.convIndex.find(c => c.day === day);
+      if(idx){ idx.n = all.length; idx.pending = true; }
+      else S.convIndex.push({ day, n: all.length, summary:'', pending:true });
+    }
+    S.convIndex.sort((a, b) => b.day.localeCompare(a.day));
+    S.convIndex = S.convIndex.slice(0, 1000);
+    S.msgs = S.msgs.filter(m => dayKey(m.ts) === today);   // recién ahora, con el archivo ya guardado
+    save();
+    summarizePending();
+    return true;
+  }catch(e){
+    console.error('[NutriSalta] No pude archivar las charlas anteriores:', e);
+    return false;
+  }finally{ rolling = false; }
+}
+function localConvSummary(msgs){
+  const said = msgs.filter(m => m.role === 'user').map(m => m.content.replace(/\s+/g, ' ').slice(0, 60));
+  return said.length ? 'Habló de: ' + said.slice(0, 3).join('; ') + (said.length > 3 ? '…' : '') : 'Charla corta.';
+}
+async function summarizePending(){
+  if(navigator.onLine === false) return;
+  for(const idx of S.convIndex.filter(c => c.pending).slice(0, 3)){
+    const rec = await convGet(idx.day); if(!rec){ idx.pending = false; continue; }
+    const transcript = rec.msgs.map(m => (m.role === 'user' ? 'Usuario: ' : 'NutriSalta: ') + m.content.slice(0, 300)).join('\n').slice(-4000);
+    let sum = '';
+    try{
+      sum = (await aiChat([
+        { role:'system', content:'Resumís charlas de un asistente de nutrición para recordarlas después. Respondés solo el resumen.' },
+        { role:'user', content:`Resumí en 1 o 2 frases (máximo 200 caracteres), en tercera persona, lo importante para recordar de esta charla con ${S.name}: qué comió, qué preguntó, qué se propuso o cómo se sintió.\n\n${transcript}` }
+      ], { temperature:0.2, max_tokens:150, allowLocal:false })).text;
+    }catch(e){ if(e.kind === 'network') return; }
+    sum = clean(sum).replace(/\s+/g, ' ').slice(0, 220);
+    if(!sum || FORBIDDEN.test(sum)) sum = localConvSummary(rec.msgs);
+    idx.summary = sum; idx.pending = false;
+    await convPut(Object.assign(rec, { summary: sum }));
+    save();
+  }
+  if(!$('#historial-panel').classList.contains('hidden')) renderHistorial();
+}
+async function openConv(day){
+  const rec = await convGet(day);
+  const box = $('#conv-list'); box.innerHTML = '';
+  $('#conv-title').textContent = keyToDate(day).toLocaleDateString('es-AR', { weekday:'long', day:'numeric', month:'long' });
+  if(!rec || !rec.msgs.length) box.innerHTML = '<div class="blank">No encontré esa charla.</div>';
+  else rec.msgs.forEach(m => renderMsg(m, null, true, box));
+  $('#conv-modal').classList.remove('hidden');
+}
 
 /* ===================== DIARIO ===================== */
 const MEALS = [
@@ -2363,8 +2517,9 @@ function saveFood(){
 }
 
 /* --- Exportar / importar --- */
-function exportData(){
-  const blob = new Blob([JSON.stringify(S, null, 2)], { type:'application/json' });
+async function exportData(){
+  const convs = await convAll().catch(() => []);
+  const blob = new Blob([JSON.stringify(Object.assign({}, S, { _convs: convs }), null, 2)], { type:'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = 'nutrisalta-' + dayKey(new Date()) + '.json';
   document.body.appendChild(a); a.click(); a.remove();
@@ -2377,8 +2532,10 @@ async function importData(file){
     const j = JSON.parse(await file.text());
     if(!j || typeof j !== 'object' || !j.name) throw new Error('formato');
     if(!confirm(`¿Reemplazar tus datos actuales con la copia de ${j.name}?`)) return;
+    const convs = Array.isArray(j._convs) ? j._convs : []; delete j._convs;
+    for(const c of convs) if(c && c.day && Array.isArray(c.msgs)) await convPut(c);
     const keep = S; S = Object.assign({}, keep, j, { conditions:'artrosis' });
-    ['msgs','clinHist','weightLog','facts','recents'].forEach(k => { if(!Array.isArray(S[k])) S[k] = []; });
+    ['msgs','clinHist','weightLog','facts','recents','convIndex'].forEach(k => { if(!Array.isArray(S[k])) S[k] = []; });
     if(!S.log || typeof S.log !== 'object') S.log = {};
     save(); location.reload();
   }catch(e){
@@ -2727,6 +2884,7 @@ function showApp(){
   $('#setup').classList.add('hidden');
   $('#app').classList.remove('hidden');
   renderAll(); refreshPanels();
+  rollover().then(ch => { if(ch){ renderAll(); refreshPanels(); } summarizePending(); });
 }
 function init(){
   load();
@@ -2792,7 +2950,8 @@ function init(){
   $('#modal').addEventListener('click', e => { if(e.target.id === 'modal') closeModal(); });
   document.addEventListener('keydown', e => {
     if(e.key !== 'Escape') return;
-    if(!$('#food-modal').classList.contains('hidden')) closeFood();
+    if(!$('#conv-modal').classList.contains('hidden')) $('#conv-modal').classList.add('hidden');
+    else if(!$('#food-modal').classList.contains('hidden')) closeFood();
     else if(!$('#modal').classList.contains('hidden')) closeModal();
   });
   $('#m-form').onsubmit = e => {
@@ -2844,7 +3003,14 @@ function init(){
     catch(err){ console.error(err); toast('No pude guardar el modelo. ¿Hay espacio suficiente?', true); }
     renderOffline();
   };
-  window.addEventListener('online', () => { setStatus(true); toast('Volvió la conexión.'); processPendingStudies(); });
+  // Si la app queda abierta y pasa la medianoche, al volver arranca la charla del día nuevo
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState === 'visible' && S.name) rollover().then(ch => { if(ch){ renderAll(); refreshPanels(); } });
+  });
+  try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(_){}
+  $('#conv-close').onclick = () => $('#conv-modal').classList.add('hidden');
+  $('#conv-modal').addEventListener('click', e => { if(e.target.id === 'conv-modal') $('#conv-modal').classList.add('hidden'); });
+  window.addEventListener('online', () => { setStatus(true); toast('Volvió la conexión.'); processPendingStudies(); summarizePending(); });
   window.addEventListener('offline', () => { setStatus('offline'); toast('Sin internet: sigo funcionando en modo local.'); });
 
   if(S.name){
