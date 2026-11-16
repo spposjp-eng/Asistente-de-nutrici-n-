@@ -347,6 +347,8 @@ main{flex:1;overflow:hidden;position:relative}
 .field select{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 12px}
 .bot-actions{margin-top:8px}
 .bot-actions .btn{padding:6px 12px;font-size:var(--fs-xs)}
+.bot-actions.logged{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:var(--fs-xs);color:var(--ok);font-weight:600;border-top:1px solid var(--line);padding-top:8px}
+.bot-actions.logged .link{font-size:var(--fs-xs)}
 .tabs .tab{font-size:var(--fs-sm)}
 @media (max-width:420px){ .energy{grid-template-columns:112px 1fr;gap:14px} .ring,.ring svg{width:112px;height:112px} .ring .center b{font-size:20px} }
 
@@ -739,11 +741,12 @@ ESTILO DE CONVERSACIÓN:
 - Cuando ${S.name} logra algo, lo celebrás genuinamente.
 - Si se desvía un día, lo normalizás y lo ayudás a retomar sin culpa.
 
-CUANDO CUENTA LO QUE COMIÓ O MANDA UNA FOTO:
-- En una línea decís qué identificaste (plato y porción aproximada).
-- Das el resumen de calorías y proteínas de forma simple, y si sirve, cómo va contra su meta del día ("llevás X de Y kcal").
+CUANDO REGISTRA COMIDAS O FOTOS:
+- Si dice que comió o está comiendo algo, o manda la foto de su plato, lo anotás en su diario (ver DATOS PARA GUARDAR).
+- Confirmás lo que anotaste en una línea (qué y en qué comida).
+- Decís el resumen de calorías y proteínas de forma simple, sumando lo que ya llevaba hoy ("con esto llevás X de Y kcal").
 - Señalás si está bien encaminado o qué podría sumar.
-- No digas que lo anotaste: se anota desde la pestaña Hoy o con el botón "Anotar este plato en el diario".
+- No anotás preguntas ("¿puedo comer…?"), planes ("mañana voy a…") ni algo que ya figure en lo que comió hoy.
 
 CUANDO SUBE UN PDF DE ANÁLISIS:
 - Explicás cada valor relacionado con la alimentación en lenguaje simple, sin tecnicismos.
@@ -768,6 +771,10 @@ DATOS PARA GUARDAR (invisible para el usuario, después del 👉):
 - Si dice su peso, agregá una línea exacta: [[PESO: 78.5]]
 - Si dice su altura: [[ALTURA: 165]] (en cm)
 - Si cuenta un dato durable útil para su alimentación (alergia, intolerancia, comida que no le gusta, rutina, si vive solo, medicación, actividad física): [[DATO: frase corta en tercera persona]]
+- Por cada alimento que comió, una línea: [[COMIDA: nombre | porción | kcal | proteínas g | carbohidratos g | grasas g | momento]]
+  Ejemplo: [[COMIDA: Empanada salteña de carne | 2 unidades | 400 | 18 | 40 | 18 | almuerzo]]
+  momento = desayuno, almuerzo, merienda, cena o colacion. Si no lo dice, usá el que corresponde a la hora: ${mealByHour()} (son las ${new Date().toLocaleTimeString('es-AR', { hour:'2-digit', minute:'2-digit' })}).
+  Números sin unidades, con porciones caseras típicas del NOA.
 - Solo datos nuevos que no estén ya arriba. Si no hay nada nuevo, no agregues ninguna de estas líneas.`;
 }
 
@@ -843,14 +850,50 @@ function detectFromText(text){
 // Saca las etiquetas [[...]] de la respuesta y las guarda
 function absorbMemory(reply){
   const found = [];
-  const body = reply.replace(/\[\[\s*(PESO|ALTURA|DATO)\s*:\s*([^\]]+?)\s*\]\]/gi, (_, k, v) => {
+  const foods = [];
+  const body = reply.replace(/\[\[\s*(PESO|ALTURA|DATO|COMIDA)\s*:\s*([^\]]+?)\s*\]\]/gi, (_, k, v) => {
     k = k.toUpperCase();
+    if(k === 'COMIDA'){ const f = parseFoodTag(v); if(f) foods.push(f); return ''; }
     if(k === 'PESO'   && addWeight(v.replace(/[^\d.,]/g,''), 'chat')) found.push('peso ' + lastWeight().kg + ' kg');
     if(k === 'ALTURA' && setHeight(v.replace(/[^\d.,]/g,''))) found.push('altura ' + S.height + ' cm');
     if(k === 'DATO'   && addFact(v)) found.push(v.length > 40 ? v.slice(0,40) + '…' : v);
     return '';
   }).replace(/\n{3,}/g, '\n\n').trim();
-  return { body, found };
+  const logged = logFoods(foods);
+  if(logged.length){
+    const kc = Math.round(logged.reduce((a, x) => a + x.kcal, 0));
+    const meals = [...new Set(logged.map(x => (MEALS.find(m => m.id === x.meal) || {}).name))].join(' y ');
+    found.push(`${meals} (${logged.length} ${logged.length === 1 ? 'ítem' : 'ítems'}, ${kc} kcal)`);
+  }
+  return { body, found, logged };
+}
+
+/* --- Comidas que el chat anota solo en el diario --- */
+function parseFoodTag(v){
+  const p = v.split('|').map(x => x.trim());
+  if(p.length < 3) return null;
+  const num = x => { const n = parseFloat(String(x || '').replace(',', '.').replace(/[^\d.]/g, '')); return isFinite(n) && n >= 0 ? n : 0; };
+  const norm = String(p[6] || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const meal = (MEALS.find(m => norm.includes(m.id)) || {}).id || mealByHour();
+  const f = { name: clean(p[0]).slice(0, 60), qty: clean(p[1]).slice(0, 40), kcal: Math.min(4000, num(p[2])), p: num(p[3]), c: num(p[4]), f: num(p[5]), meal };
+  return f.name && f.kcal > 0 && !FORBIDDEN.test(f.name) ? f : null;
+}
+function logFoods(foods){
+  if(!foods.length) return [];
+  const k = dayKey(new Date()), day = getDay(k), now = Date.now(), out = [];
+  foods.slice(0, 12).forEach(x => {
+    // evito duplicar si el mismo alimento se anotó en los últimos 20 minutos
+    if(day.meals.some(m => m.name.toLowerCase() === x.name.toLowerCase() && now - (m.ts || 0) < 20 * 60e3)) return;
+    const item = Object.assign({ id: now.toString(36) + Math.random().toString(36).slice(2, 6), ts: now, src:'chat' }, x);
+    day.meals.push(item); out.push(item);
+    S.recents = [{ name:x.name, qty:x.qty, kcal:x.kcal, p:x.p, c:x.c, f:x.f }, ...S.recents.filter(r => r.name.toLowerCase() !== x.name.toLowerCase())].slice(0, 12);
+  });
+  if(out.length) pruneLog();
+  return out.map(x => ({ day:k, id:x.id, meal:x.meal, kcal:x.kcal, name:x.name }));
+}
+function undoLogged(m){
+  (m.logged || []).forEach(l => { const d = S.log[l.day]; if(d) d.meals = d.meals.filter(x => x.id !== l.id); });
+  m.logged = []; m.undone = true; save(); refreshPanels();
 }
 
 /* ===================== ANÁLISIS DE ESTUDIOS (PDF) ===================== */
@@ -1109,11 +1152,12 @@ async function send(){
     typingRow.remove();
     const botMsg = { role:'assistant', content:mem.body, ts:Date.now() };
     if(engine !== 'groq') botMsg.engine = engine;
-    if(att && att.type === 'img') imgCache[botMsg.ts] = { dataUrl: att.dataUrl, text };
+    if(mem.logged && mem.logged.length) botMsg.logged = mem.logged;
+    else if(att && att.type === 'img') imgCache[botMsg.ts] = { dataUrl: att.dataUrl, text };
     S.msgs.push(botMsg); save();
     renderMsg(botMsg);
     const all = [...new Set([...learned, ...mem.found])];
-    if(all.length) toast('Lo anoto: ' + all.join(' · '));
+    if(all.length) toast('Anotado: ' + all.join(' · '));
     setStatus(engine === 'groq' || PROVIDER_NAMES[engine] ? true : 'offline');
   }catch(err){
     typingRow.remove();
@@ -1450,8 +1494,16 @@ function renderMsg(m, imgUrl, noScroll){
   }
   const eng = !m.engine ? '' : PROVIDER_NAMES[m.engine] ? ' · vía ' + esc(PROVIDER_NAMES[m.engine]) : ' · sin conexión (' + esc(ENGINE_NAMES[m.engine] || m.engine) + ')';
   inner += `<span class="meta">${fmtTime(m.ts)}${eng}</span>`;
-  if(m.role !== 'user' && imgCache[m.ts]) inner += `<div class="bot-actions"><button class="btn btn-ghost" data-logimg="${m.ts}">Anotar este plato en el diario</button></div>`;
+  if(m.role !== 'user' && m.logged && m.logged.length){
+    const kc = Math.round(m.logged.reduce((a, x) => a + x.kcal, 0));
+    const meals = [...new Set(m.logged.map(x => (MEALS.find(z => z.id === x.meal) || {}).name))].join(' y ');
+    inner += `<div class="bot-actions logged"><span>✓ Anotado en ${esc(meals)} · ${kc} kcal</span><button class="link" data-undo="1">Deshacer</button></div>`;
+  }else if(m.role !== 'user' && m.undone){
+    inner += `<div class="bot-actions logged"><span>Se quitó del diario</span></div>`;
+  }else if(m.role !== 'user' && imgCache[m.ts]) inner += `<div class="bot-actions"><button class="btn btn-ghost" data-logimg="${m.ts}">Anotar este plato en el diario</button></div>`;
   row.innerHTML = (m.role === 'user' ? '' : '<div class="avatar" aria-hidden="true">NS</div>') + `<div class="bubble">${inner}</div>`;
+  const ub = row.querySelector('[data-undo]');
+  if(ub) ub.onclick = () => { undoLogged(m); const meta = row.querySelector('.bot-actions'); if(meta) meta.innerHTML = '<span>Se quitó del diario</span>'; toast('Listo, lo saqué del diario.'); };
   const lb = row.querySelector('[data-logimg]');
   if(lb) lb.onclick = () => { const c = imgCache[m.ts]; openFood({ dataUrl:c.dataUrl, text:c.text, auto:true }); };
   list.appendChild(row);
