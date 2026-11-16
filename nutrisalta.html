@@ -30,6 +30,8 @@
   /* Acento cardón */
   --ok:           hsl(var(--seed2-h) 32% 32%);
   --ok-soft:      hsl(var(--seed2-h) 28% 94%);
+  --warn:         hsl(34 70% 34%);
+  --warn-soft:    hsl(38 80% 92%);
 
   /* Neutros (levemente cálidos, tono adobe) */
   --bg:           hsl(var(--neutral-h) 14% 97%);
@@ -59,6 +61,8 @@
     --on-brand:     hsl(var(--seed-h) 40% 10%);
     --ok:           hsl(var(--seed2-h) 35% 62%);
     --ok-soft:      hsl(var(--seed2-h) 20% 16%);
+    --warn:         hsl(38 75% 65%);
+    --warn-soft:    hsl(36 35% 17%);
     --bg:           hsl(var(--neutral-h) 8% 9%);
     --surface:      hsl(var(--neutral-h) 7% 12.5%);
     --surface-2:    hsl(var(--neutral-h) 6% 16%);
@@ -212,6 +216,33 @@ main{flex:1;overflow:hidden;position:relative}
 .blank{padding:28px 16px;text-align:center;color:var(--text-2);font-size:var(--fs-sm)}
 .blank b{display:block;color:var(--text);margin-bottom:4px;font-size:var(--fs-md)}
 
+.delta{font-family:var(--mono);font-size:var(--fs-xs);color:var(--text-3);font-weight:500;margin-left:4px}
+.study-list{display:flex;flex-direction:column;gap:10px}
+.study-head{display:flex;gap:12px;align-items:flex-start;padding:14px 8px 0 16px}
+.study-head .ico{flex:none;width:36px;height:36px;border-radius:8px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;font-family:var(--mono);font-size:10px;font-weight:800}
+.study-head .body{flex:1;min-width:0}
+.study-head .body b{display:block;font-size:var(--fs-md)}
+.study-head .body span{display:block;font-size:var(--fs-xs);color:var(--text-3)}
+.study-head .body .file{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.study-sum{margin:10px 16px 0;font-size:var(--fs-sm);color:var(--text-2)}
+.vals{margin:10px 0 0;border-top:1px solid var(--line)}
+.vals summary{padding:11px 16px;cursor:pointer;font-size:var(--fs-sm);font-weight:600;list-style-position:inside}
+.vals[open] summary{border-bottom:1px solid var(--line)}
+.study > :last-child:not(.vals){margin-bottom:14px}
+.vtable{width:100%;border-collapse:collapse;font-size:var(--fs-sm)}
+.vtable td{padding:8px 16px;border-top:1px solid var(--line);vertical-align:middle}
+.vtable tr:first-child td{border-top:0}
+.vtable td:first-child{padding-right:6px}
+.vtable .num{font-family:var(--mono);white-space:nowrap;text-align:right}
+.vtable .num small{color:var(--text-3);font-family:var(--font)}
+.vtable .ref{color:var(--text-3);font-size:var(--fs-xs);white-space:nowrap}
+.vtable td:last-child{text-align:right;padding-left:4px}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:600;white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:520px){ .vtable .ref{display:none} }
+
 /* ---------- Modal ---------- */
 .overlay{position:fixed;inset:0;background:hsl(0 0% 0% / .4);display:grid;place-items:center;padding:16px;z-index:50}
 .modal{width:100%;max-width:440px;background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--shadow);max-height:90vh;overflow:auto}
@@ -355,6 +386,10 @@ details.adv .field{margin-top:10px}
       <div class="field"><label for="m-name">Nombre</label><input id="m-name" maxlength="40" required></div>
       <div class="field"><label for="m-age">Edad</label><input id="m-age" type="number" min="1" max="120" required></div>
       <div class="field"><label for="m-goals">Objetivos</label><textarea id="m-goals" rows="3" maxlength="400"></textarea></div>
+      <div class="two">
+        <div class="field"><label for="m-weight">Peso (kg)</label><input id="m-weight" type="number" inputmode="decimal" step="0.1" min="25" max="300" placeholder="Ej: 72.5"></div>
+        <div class="field"><label for="m-height">Altura (cm)</label><input id="m-height" type="number" inputmode="numeric" min="100" max="230" placeholder="Ej: 162"></div>
+      </div>
       <details class="adv">
         <summary>Conexión avanzada</summary>
         <div class="field">
@@ -399,7 +434,11 @@ if(window.pdfjsLib){
 /* ===================== ESTADO ===================== */
 let S = {
   name:'', age:'', goals:'', conditions:'artrosis',
-  msgs:[], nMsgs:0, nImgs:0, nPdfs:0, since:null, clinHist:[]
+  msgs:[], nMsgs:0, nImgs:0, nPdfs:0, since:null, clinHist:[],
+  // Contexto persistente
+  height:'',        // cm
+  weightLog:[],     // [{kg, date, src:'chat'|'pdf'|'manual'}]
+  facts:[]          // [{t, date}] datos durables que contó el usuario (alergias, gustos, rutina...)
 };
 let pending = null;   // adjunto en preview: {type:'img'|'pdf', name, dataUrl?, text?, pages?, size}
 let busy = false;
@@ -424,15 +463,52 @@ function apiKey(){
 }
 
 /* ===================== SYSTEM PROMPT ===================== */
+/* Contexto de salud persistente que se inyecta en cada respuesta */
+function healthContext(){
+  const out = [];
+  // Medidas
+  const w = lastWeight();
+  if(w){
+    let line = `- Peso actual: ${w.kg} kg (registrado el ${fmtDate(w.date)})`;
+    const prev = S.weightLog.length > 1 ? S.weightLog[S.weightLog.length-2] : null;
+    if(prev){ const d = +(w.kg - prev.kg).toFixed(1); line += `; antes ${prev.kg} kg (${fmtDate(prev.date)}), diferencia ${d>0?'+':''}${d} kg`; }
+    out.push(line);
+  }else out.push('- Peso: no lo sabemos todavía (si viene al caso, preguntaselo con naturalidad).');
+  if(S.height) out.push(`- Altura: ${S.height} cm`);
+  const imc = bmi(); if(imc) out.push(`- IMC aproximado: ${imc}`);
+
+  // Valores de laboratorio: el más reciente de cada marcador
+  const latest = latestValues();
+  const studies = S.clinHist.filter(h => h.isStudy !== false);
+  if(studies.length){
+    out.push(`\nEstudios cargados (${studies.length}):`);
+    studies.slice(-6).forEach(h => out.push(`- ${h.kind || 'Estudio'} del ${h.studyDate ? fmtDate(h.studyDate) : fmtDate(h.date)}${h.summary ? ': ' + h.summary : ''}`));
+  }
+  if(latest.length){
+    out.push('\nÚltimos valores conocidos (usalos para personalizar las recomendaciones):');
+    latest.slice(0, 35).forEach(v => out.push(
+      `- ${v.nombre}: ${v.valor}${v.unidad ? ' ' + v.unidad : ''}` +
+      `${v.referencia ? ' (ref. ' + v.referencia + ')' : ''}` +
+      `${v.estado && v.estado !== 'sin_ref' ? ' → ' + v.estado : ''}` +
+      ` [${fmtDate(v.fecha)}]`));
+  }
+  if(!studies.length) out.push('- Todavía no subió estudios.');
+
+  if(S.facts.length){
+    out.push('\nOtras cosas que te contó:');
+    S.facts.slice(-25).forEach(f => out.push('- ' + f.t));
+  }
+  return out.join('\n');
+}
+
 function systemPrompt(){
-  const hist = S.clinHist.length
-    ? S.clinHist.map(h => `- ${h.name} (${fmtDate(h.date)})`).join('\n')
-    : '- Sin análisis cargados todavía.';
   return `Sos NutriSalta, un asistente de nutrición y alimentación para ${S.name}, ${S.age} años, con artrosis.
 Objetivos de ${S.name}: ${S.goals || 'comer más sano y sentirse mejor'}.
 
-Historial clínico (solo análisis subidos en PDF):
-${hist}
+CONTEXTO DE SALUD DE ${S.name.toUpperCase()} (memoria persistente, tenelo siempre en cuenta):
+${healthContext()}
+
+Usá este contexto de forma natural: si un valor está alto o bajo, adaptá las recetas y consejos a eso sin repetirle los números a cada rato.
 
 ESTILO
 - Hablás de vos, como una persona de Salta (argentino salteño): cálido, cercano, simple. Usá expresiones locales con moderación.
@@ -449,19 +525,167 @@ LÍMITES ESTRICTOS
 - NUNCA generes miedo ni angustia. Si un valor está fuera de rango, decilo con calma, explicá qué alimentos ayudan y sugerí comentarlo con su médico en el próximo control, sin dramatizar.
 - No diagnosticás ni recetás medicamentos.
 
-ANÁLISIS DE SANGRE (PDF)
-- Leé los valores, explicá en lenguaje simple los que tienen que ver con la alimentación, y dá recomendaciones de comida concretas.
+ESTUDIOS (PDF)
+- Cuando llega un estudio nuevo, explicá en simple los valores que tienen que ver con la alimentación (empezando por los que conviene mejorar) y dá recomendaciones de comida concretas. Si hay estudios anteriores, comentá la evolución con tono positivo.
 
 FOTOS DE COMIDA
 - Identificá el plato, estimá porciones, calorías aproximadas y macronutrientes, y decí qué tan bien le viene para la artrosis y sus objetivos. Sugerí un ajuste fácil.
 
+MEMORIA (invisible para el usuario)
+- Si en su último mensaje el usuario dice su peso, agregá al final una línea exacta: [[PESO: 78.5]]
+- Si dice su altura: [[ALTURA: 165]] (en cm)
+- Si cuenta un dato durable útil para su alimentación (alergia, intolerancia, comida que no le gusta, rutina, si vive solo, medicación que toma, actividad física), agregá: [[DATO: frase corta en tercera persona]]
+- Solo datos nuevos que no estén ya en el contexto. Si no hay nada nuevo, no agregues ninguna línea de memoria.
+
 CIERRE
-- Terminá SIEMPRE con un consejo nutricional concreto y motivador (una línea, empezando con "👉").`;
+- Terminá SIEMPRE con un consejo nutricional concreto y motivador (una línea, empezando con "👉"), antes de cualquier línea de memoria.`;
+}
+
+/* ===================== MEMORIA / CONTEXTO ===================== */
+// Términos que nunca deben guardarse ni mostrarse (marcadores tumorales, etc.)
+const FORBIDDEN = /c[aá]ncer|tumor|malign|leucemia|linfoma|met[aá]stasis|oncol|neoplas|carcinoma|\bCEA\b|\bCA[\s-]?(125|15[.-]?3|19[.-]?9|72[.-]?4)\b|\bPSA\b|alfa[\s-]?feto|\bAFP\b|terminal/i;
+const clean = s => String(s || '').trim();
+
+function lastWeight(){ return S.weightLog.length ? S.weightLog[S.weightLog.length-1] : null; }
+function bmi(){
+  const w = lastWeight(), h = parseFloat(S.height);
+  if(!w || !h) return null;
+  return (w.kg / Math.pow(h/100, 2)).toFixed(1);
+}
+function addWeight(kg, src, date){
+  kg = +String(kg).replace(',', '.');
+  if(!(kg >= 25 && kg <= 300)) return false;
+  kg = +kg.toFixed(1);
+  const last = lastWeight();
+  const d = date || new Date().toISOString();
+  // Si es el mismo día y mismo valor, no duplico
+  if(last && last.kg === kg && last.date.slice(0,10) === d.slice(0,10)) return false;
+  S.weightLog.push({ kg, date:d, src });
+  S.weightLog.sort((a,b) => a.date.localeCompare(b.date));
+  S.weightLog = S.weightLog.slice(-50);
+  return true;
+}
+function setHeight(cm){
+  cm = +String(cm).replace(',', '.');
+  if(cm > 0 && cm < 3) cm = cm * 100;          // "1,65" → 165
+  if(!(cm >= 100 && cm <= 230)) return false;
+  S.height = String(Math.round(cm));
+  return true;
+}
+function addFact(t){
+  t = clean(t).replace(/\.$/, '');
+  if(!t || t.length > 160 || FORBIDDEN.test(t)) return false;
+  if(S.facts.some(f => f.t.toLowerCase() === t.toLowerCase())) return false;
+  S.facts.push({ t, date:new Date().toISOString() });
+  S.facts = S.facts.slice(-40);
+  return true;
+}
+// Valor más reciente de cada marcador entre todos los estudios
+function latestValues(){
+  const map = new Map();
+  S.clinHist.forEach(h => (h.values || []).forEach(v => {
+    const fecha = h.studyDate || h.date;
+    const k = v.nombre.toLowerCase();
+    const prev = map.get(k);
+    if(!prev || prev.fecha <= fecha) map.set(k, Object.assign({}, v, { fecha }));
+  }));
+  // primero los fuera de rango
+  return [...map.values()].sort((a,b) => (a.estado==='normal') - (b.estado==='normal'));
+}
+
+// Detecta peso/altura en lo que escribe el usuario (red de seguridad, además de las etiquetas del modelo)
+function detectFromText(text){
+  const found = [];
+  const t = text.toLowerCase();
+  let m = t.match(/(?:peso|pes[eé]|pesando|estoy en|baj[eé] a|sub[ií] a|llegu[eé] a)\D{0,12}(\d{2,3}(?:[.,]\d{1,2})?)\s*(?:kg|kilos?|k\b)?/);
+  if(!m) m = t.match(/\b(\d{2,3}(?:[.,]\d{1,2})?)\s*(?:kg|kilos)\b/);
+  if(m && addWeight(m[1], 'chat')) found.push('peso ' + lastWeight().kg + ' kg');
+  const h = t.match(/(?:mido|altura|estatura)\D{0,10}(\d(?:[.,]\d{1,2})|\d{3})\s*(?:m|cm|metros?)?/);
+  if(h && setHeight(h[1])) found.push('altura ' + S.height + ' cm');
+  return found;
+}
+// Saca las etiquetas [[...]] de la respuesta y las guarda
+function absorbMemory(reply){
+  const found = [];
+  const body = reply.replace(/\[\[\s*(PESO|ALTURA|DATO)\s*:\s*([^\]]+?)\s*\]\]/gi, (_, k, v) => {
+    k = k.toUpperCase();
+    if(k === 'PESO'   && addWeight(v.replace(/[^\d.,]/g,''), 'chat')) found.push('peso ' + lastWeight().kg + ' kg');
+    if(k === 'ALTURA' && setHeight(v.replace(/[^\d.,]/g,''))) found.push('altura ' + S.height + ' cm');
+    if(k === 'DATO'   && addFact(v)) found.push(v.length > 40 ? v.slice(0,40) + '…' : v);
+    return '';
+  }).replace(/\n{3,}/g, '\n\n').trim();
+  return { body, found };
+}
+
+/* ===================== ANÁLISIS DE ESTUDIOS (PDF) ===================== */
+async function analyzeStudy(text, fileName){
+  const prompt = `Analizá el texto extraído de un PDF llamado "${fileName}". Determiná si es un estudio médico (análisis de laboratorio, perfil lipídico, hemograma, densitometría, informe de control, etc.) y extraé los datos.
+Respondé SOLO con un objeto JSON con esta forma exacta:
+{
+  "es_estudio": true,
+  "tipo": "Análisis de sangre | Hemograma | Perfil lipídico | Densitometría | ... (corto)",
+  "fecha_estudio": "YYYY-MM-DD o null",
+  "laboratorio": "nombre o null",
+  "valores": [ { "nombre": "Glucosa", "valor": "110", "unidad": "mg/dL", "referencia": "70-100", "estado": "alto | bajo | normal | sin_ref" } ],
+  "peso_kg": null,
+  "altura_cm": null,
+  "resumen": "1 o 2 frases simples sobre lo que importa para la alimentación"
+}
+Reglas:
+- Incluí todos los valores numéricos del estudio con su unidad y rango de referencia si figura.
+- "estado" compará el valor con la referencia.
+- Usá nombres en español y cortos (ej: "Colesterol LDL", "Hemoglobina", "TSH", "Vitamina D").
+- NO incluyas marcadores tumorales ni nada relacionado con cáncer, tumores u oncología: omitilos por completo.
+- El resumen no debe alarmar.
+- Si no es un estudio médico, devolvé "es_estudio": false y "valores": [].
+
+TEXTO:
+"""
+${text}
+"""`;
+  const raw = await callGroq([
+    { role:'system', content:'Sos un extractor de datos de estudios médicos. Respondés únicamente JSON válido.' },
+    { role:'user', content:prompt }
+  ], MODEL, { json:true, temperature:0.1, max_tokens:2000 });
+  let j;
+  try{ j = JSON.parse(raw); }
+  catch(e){
+    const m = raw.match(/\{[\s\S]*\}/);
+    if(!m) throw Object.assign(new Error('No pude interpretar el estudio.'), { kind:'parse' });
+    j = JSON.parse(m[0]);
+  }
+  const estados = ['alto','bajo','normal','sin_ref'];
+  const values = (Array.isArray(j.valores) ? j.valores : [])
+    .map(v => ({
+      nombre: clean(v.nombre).slice(0,50),
+      valor: clean(v.valor).slice(0,20),
+      unidad: clean(v.unidad).slice(0,20),
+      referencia: clean(v.referencia).slice(0,40),
+      estado: estados.includes(clean(v.estado).toLowerCase()) ? clean(v.estado).toLowerCase() : 'sin_ref'
+    }))
+    .filter(v => v.nombre && v.valor && !FORBIDDEN.test(v.nombre + ' ' + v.referencia))
+    .slice(0, 60);
+  let fecha = /^\d{4}-\d{2}-\d{2}$/.test(clean(j.fecha_estudio)) ? clean(j.fecha_estudio) : null;
+  if(fecha && (new Date(fecha) > new Date() || new Date(fecha).getFullYear() < 1990)) fecha = null;
+  const summary = FORBIDDEN.test(j.resumen || '') ? '' : clean(j.resumen).slice(0, 300);
+  return {
+    isStudy: j.es_estudio !== false && values.length > 0,
+    kind: clean(j.tipo).slice(0,60) || 'Estudio',
+    studyDate: fecha ? fecha + 'T12:00:00.000Z' : null,
+    lab: FORBIDDEN.test(j.laboratorio || '') ? '' : clean(j.laboratorio).slice(0,60),
+    values, summary,
+    weight: j.peso_kg, height: j.altura_cm
+  };
+}
+function studyAsText(st){
+  return st.values.map(v => `${v.nombre}: ${v.valor}${v.unidad ? ' ' + v.unidad : ''}${v.referencia ? ' (ref. ' + v.referencia + ')' : ''}${v.estado !== 'sin_ref' ? ' → ' + v.estado : ''}`).join('\n');
 }
 
 /* ===================== LLAMADA A GROQ ===================== */
-async function callGroq(messages, model){
-  const body = { model, messages, temperature: 0.6, max_tokens: 1024 };
+async function callGroq(messages, model, opts){
+  opts = opts || {};
+  const body = { model, messages, temperature: opts.temperature ?? 0.6, max_tokens: opts.max_tokens || 1024 };
+  if(opts.json) body.response_format = { type: 'json_object' };
   let res;
   // 1) Error de red (sin respuesta: DNS, CORS, offline...)
   try{
@@ -526,16 +750,9 @@ async function send(){
   let attMeta = null;
 
   if(att && att.type === 'pdf'){
-    apiContent =
-`[El usuario subió un análisis de sangre en PDF: "${att.name}" (${att.pages} pág.). Texto extraído:]
-"""
-${att.text}
-"""
-${text ? '\nPregunta del usuario: ' + text : '\nExplicame estos resultados en relación a mi alimentación y la artrosis.'}`;
-    shown = text || 'Te paso mi análisis de sangre.';
+    shown = text || 'Te paso mi estudio.';
     attMeta = {type:'pdf', name:att.name};
-    S.nPdfs++;
-    S.clinHist.push({ name: att.name, date: new Date().toISOString(), pages: att.pages });
+    apiContent = rawPdfMessage(att, text);   // por si el análisis falla
   }
   if(att && att.type === 'img'){
     apiContent = '[El usuario envió una foto de comida. Analizala nutricionalmente.]' + (text ? '\n' + text : '');
@@ -547,6 +764,7 @@ ${text ? '\nPregunta del usuario: ' + text : '\nExplicame estos resultados en re
   const userMsg = { role:'user', content:apiContent, shown, att:attMeta, ts:Date.now() };
   S.msgs.push(userMsg);
   S.nMsgs++;
+  const learned = text ? detectFromText(text) : [];
   save();
 
   txtEl.value = ''; autosize(); clearPending();
@@ -554,21 +772,32 @@ ${text ? '\nPregunta del usuario: ' + text : '\nExplicame estos resultados en re
   setBusy(true);
   const typingRow = showTyping();
 
-  // Contexto: system + últimos N mensajes
-  const ctx = S.msgs.slice(-CTX_MSGS).map(m => ({ role:m.role, content:m.content }));
-  const messages = [{ role:'system', content:systemPrompt() }, ...ctx];
-
   try{
+    // PDF: primero lo analizo y lo guardo como contexto, después respondo
+    if(att && att.type === 'pdf'){
+      setStatusText('Analizando el estudio…');
+      userMsg.content = await processPdf(att, text);
+      save();
+    }
+
+    // Contexto: system (con memoria de salud) + últimos N mensajes
+    const ctx = S.msgs.slice(-CTX_MSGS).map(m => ({ role:m.role, content:m.content }));
+    const messages = [{ role:'system', content:systemPrompt() }, ...ctx];
+
+    setStatusText('Escribiendo…');
     let reply;
     if(att && att.type === 'img'){
       reply = await sendWithImage(messages, att.dataUrl);
     }else{
       reply = await callGroq(messages, MODEL);
     }
+    const mem = absorbMemory(reply);
     typingRow.remove();
-    const botMsg = { role:'assistant', content:reply, ts:Date.now() };
+    const botMsg = { role:'assistant', content:mem.body, ts:Date.now() };
     S.msgs.push(botMsg); save();
     renderMsg(botMsg);
+    const all = [...new Set([...learned, ...mem.found])];
+    if(all.length) toast('Lo anoto: ' + all.join(' · '));
     setStatus(true);
   }catch(err){
     typingRow.remove();
@@ -579,6 +808,44 @@ ${text ? '\nPregunta del usuario: ' + text : '\nExplicame estos resultados en re
     setBusy(false);
     refreshPanels();
   }
+}
+
+function rawPdfMessage(att, text){
+  return `[El usuario subió un PDF: "${att.name}" (${att.pages} pág.). Texto extraído:]
+"""
+${att.text}
+"""
+${text ? '\nPregunta del usuario: ' + text : '\nExplicame estos resultados en relación a mi alimentación y la artrosis.'}`;
+}
+
+// Analiza el PDF con la IA, guarda el estudio en clinHist (contexto persistente)
+// y devuelve el contenido compacto que se manda al chat.
+async function processPdf(att, text){
+  const entry = { name: att.name, date: new Date().toISOString(), pages: att.pages };
+  S.nPdfs++;
+  let st;
+  try{
+    st = await analyzeStudy(att.text, att.name);
+  }catch(err){
+    if(err.kind === 'network') throw err;
+    console.warn('[NutriSalta] No se pudo estructurar el estudio, mando el texto crudo:', err);
+    S.clinHist.push(Object.assign(entry, { isStudy:true, kind:'Estudio', values:[], summary:'' }));
+    return rawPdfMessage(att, text);
+  }
+  if(!st.isStudy){
+    toast('Este PDF no parece un estudio médico. No lo agrego al historial clínico.');
+    return `[El usuario subió un PDF ("${att.name}") que no parece un estudio médico. Texto:]\n"""\n${att.text.slice(0, 3000)}\n"""` + (text ? '\n' + text : '');
+  }
+  Object.assign(entry, { isStudy:true, kind:st.kind, studyDate:st.studyDate, lab:st.lab, values:st.values, summary:st.summary });
+  S.clinHist.push(entry);
+  const extra = [];
+  if(st.weight && addWeight(st.weight, 'pdf', st.studyDate || undefined)) extra.push('peso ' + lastWeight().kg + ' kg');
+  if(st.height && !S.height && setHeight(st.height)) extra.push('altura ' + S.height + ' cm');
+  const fuera = st.values.filter(v => v.estado === 'alto' || v.estado === 'bajo').length;
+  toast(`Guardé tu ${st.kind.toLowerCase()}: ${st.values.length} valores` + (fuera ? `, ${fuera} para mirar` : '') + (extra.length ? ' · ' + extra.join(' · ') : ''));
+  return `[El usuario subió un estudio: ${st.kind}${st.studyDate ? ' del ' + fmtDate(st.studyDate) : ''}${st.lab ? ' (' + st.lab + ')' : ''}. Ya quedó guardado en su historial. Valores:]
+${studyAsText(st)}
+${text ? '\nPregunta del usuario: ' + text : '\nExplicale en simple qué significan estos resultados para su alimentación y la artrosis, empezando por lo que conviene mejorar.'}`;
 }
 
 // Intenta con modelo de visión enviando la imagen real; si falla, cae al modelo de texto.
@@ -785,6 +1052,9 @@ function md(src){
 /* ===================== PERFIL / HISTORIAL ===================== */
 function renderPerfil(){
   const days = S.since ? Math.max(1, Math.ceil((Date.now() - new Date(S.since)) / 864e5)) : 1;
+  const w = lastWeight(), imc = bmi();
+  const wl = S.weightLog.slice(-6).reverse();
+  const srcName = {chat:'contado en el chat', pdf:'de un estudio', manual:'cargado a mano'};
   $('#perfil-body').innerHTML = `
     <h2 class="sec-title">Tus datos</h2>
     <dl class="card" style="margin:0">
@@ -794,20 +1064,44 @@ function renderPerfil(){
       <div class="kv"><dt>Condición</dt><dd><span class="badge">Artrosis</span></dd></div>
       <div class="kv"><dt>Usás NutriSalta desde</dt><dd>${S.since ? fmtDate(S.since) : '—'} · ${days} ${days===1?'día':'días'}</dd></div>
     </dl>
+
+    <h2 class="sec-title">Medidas</h2>
+    <div class="stats">
+      <div class="stat"><b>${w ? w.kg : '—'}</b><span>Peso (kg)</span></div>
+      <div class="stat"><b>${S.height || '—'}</b><span>Altura (cm)</span></div>
+      <div class="stat"><b>${imc || '—'}</b><span>IMC</span></div>
+    </div>
+    ${wl.length ? `<div class="card" style="margin-top:8px"><ul class="timeline">${wl.map((x,i) => {
+        const prev = S.weightLog[S.weightLog.length - 2 - i];
+        const d = prev ? +(x.kg - prev.kg).toFixed(1) : null;
+        return `<li><div class="body"><b>${x.kg} kg${d ? ` <span class="delta">${d>0?'+':''}${d}</span>` : ''}</b>
+          <span>${fmtDate(x.date)} · ${srcName[x.src] || ''}</span></div></li>`;
+      }).join('')}</ul></div>`
+      : `<p class="hint" style="margin:8px 2px 0">Contale tu peso en el chat (ej: "hoy me pesé, 78 kilos") o cargalo en Editar mis datos. Lo uso para ajustar porciones.</p>`}
+
+    <h2 class="sec-title">Lo que NutriSalta sabe de vos</h2>
+    <div class="card">${S.facts.length
+      ? `<ul class="timeline">${S.facts.map((f,i) => `<li><div class="body"><b style="white-space:normal">${esc(f.t)}</b><span>${fmtDate(f.date)}</span></div>
+          <button class="icon-btn" data-fact="${i}" aria-label="Olvidar este dato" title="Olvidar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></li>`).join('')}</ul>`
+      : `<div class="blank">Cuando me cuentes cosas como alergias, gustos o tu rutina, las anoto acá para tenerlas en cuenta.</div>`}</div>
+
     <h2 class="sec-title">Actividad</h2>
     <div class="stats">
       <div class="stat"><b>${S.nMsgs}</b><span>Consultas</span></div>
       <div class="stat"><b>${S.nImgs}</b><span>Fotos de platos</span></div>
-      <div class="stat"><b>${S.nPdfs}</b><span>Análisis</span></div>
+      <div class="stat"><b>${S.nPdfs}</b><span>PDFs leídos</span></div>
     </div>
     <div class="actions">
       <button class="btn btn-ghost" id="p-edit">Editar mis datos</button>
       <button class="btn btn-ghost" id="p-clear">Borrar conversación</button>
       <button class="btn btn-danger" id="p-reset">Empezar de cero</button>
     </div>`;
+  $('#perfil-body').querySelectorAll('[data-fact]').forEach(b => b.onclick = () => {
+    S.facts.splice(+b.dataset.fact, 1); save(); renderPerfil(); toast('Listo, lo olvidé.');
+  });
   $('#p-edit').onclick = openModal;
   $('#p-clear').onclick = () => {
-    if(!confirm('¿Borrar la conversación? Tus datos y el historial de análisis se mantienen.')) return;
+    if(!confirm('¿Borrar la conversación? Tus datos, medidas y estudios se mantienen.')) return;
     S.msgs = []; save(); renderAll(); toast('Conversación borrada.');
   };
   $('#p-reset').onclick = () => {
@@ -817,14 +1111,37 @@ function renderPerfil(){
   };
 }
 function renderHistorial(){
-  const items = S.clinHist.slice().reverse();
-  const list = items.length
-    ? `<ul class="timeline">${items.map(h=>`
-        <li><div class="ico">PDF</div>
-          <div class="body"><b>${esc(h.name)}</b>
-          <span>${fmtDate(h.date)} · ${fmtTime(new Date(h.date).getTime())}${h.pages?` · ${h.pages} ${h.pages===1?'página':'páginas'}`:''}</span></div>
-        </li>`).join('')}</ul>`
-    : `<div class="blank"><b>Todavía no subiste análisis</b>Tocá el ícono de documento en el chat y elegí el PDF de tu último análisis de sangre. Lo leo y te explico qué comer según los resultados.</div>`;
+  const studies = S.clinHist.map((h,i) => Object.assign({ i }, h)).filter(h => h.isStudy !== false).reverse();
+  const estadoTxt = { alto:'Alto', bajo:'Bajo', normal:'Normal', sin_ref:'' };
+  const studyCard = h => {
+    const vals = (h.values || []).slice().sort((a,b) => (a.estado==='normal') - (b.estado==='normal'));
+    const fuera = vals.filter(v => v.estado === 'alto' || v.estado === 'bajo').length;
+    return `<article class="card study">
+      <header class="study-head">
+        <div class="ico">PDF</div>
+        <div class="body">
+          <b>${esc(h.kind || 'Estudio')}</b>
+          <span>${h.studyDate ? 'Estudio del ' + fmtDate(h.studyDate) : 'Subido el ' + fmtDate(h.date)}${h.lab ? ' · ' + esc(h.lab) : ''}</span>
+          <span class="file">${esc(h.name)}</span>
+        </div>
+        <button class="icon-btn" data-del="${h.i}" aria-label="Quitar este estudio" title="Quitar del historial"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
+      </header>
+      ${h.summary ? `<p class="study-sum">${esc(h.summary)}</p>` : ''}
+      ${vals.length ? `
+        <details class="vals" ${fuera ? '' : ''}>
+          <summary>${vals.length} valores${fuera ? ` · <span class="pill warn">${fuera} para mirar</span>` : ` · <span class="pill ok">todo en rango</span>`}</summary>
+          <table class="vtable"><tbody>${vals.map(v => `<tr>
+            <td>${esc(v.nombre)}</td>
+            <td class="num">${esc(v.valor)} <small>${esc(v.unidad)}</small></td>
+            <td class="ref">${v.referencia ? esc(v.referencia) : ''}</td>
+            <td>${estadoTxt[v.estado] ? `<span class="pill ${v.estado==='normal'?'ok':'warn'}">${estadoTxt[v.estado]}</span>` : ''}</td>
+          </tr>`).join('')}</tbody></table>
+        </details>` : `<p class="study-sum hint">No pude leer valores de este PDF; igual lo tengo en cuenta.</p>`}
+    </article>`;
+  };
+  const list = studies.length
+    ? studies.map(studyCard).join('')
+    : `<div class="card"><div class="blank"><b>Todavía no subiste estudios</b>Tocá el ícono de documento en el chat y elegí el PDF de tu último análisis. Lo leo, guardo los valores y los uso para darte mejores consejos.</div></div>`;
   const photos = S.msgs.filter(m => m.att && m.att.type === 'img').slice(-10).reverse();
   const photoList = photos.length
     ? `<ul class="timeline">${photos.map(m=>`
@@ -833,17 +1150,23 @@ function renderHistorial(){
         </li>`).join('')}</ul>`
     : `<div class="blank"><b>Sin fotos de platos</b>Sacale una foto a lo que vas a comer y te digo cómo viene para tus articulaciones.</div>`;
   $('#historial-body').innerHTML = `
-    <h2 class="sec-title">Historial clínico · ${S.clinHist.length} ${S.clinHist.length===1?'análisis':'análisis'}</h2>
-    <div class="card">${list}</div>
-    <p class="hint" style="margin:8px 2px 0">Se arma solo con los PDFs que subís. NutriSalta los tiene en cuenta en cada respuesta.</p>
+    <h2 class="sec-title">Historial clínico · ${studies.length} ${studies.length===1?'estudio':'estudios'}</h2>
+    <div class="study-list">${list}</div>
+    <p class="hint" style="margin:8px 2px 0">Se arma solo con los PDFs que subís. NutriSalta usa los últimos valores de cada estudio en todas sus respuestas.</p>
     <h2 class="sec-title">Platos analizados</h2>
     <div class="card">${photoList}</div>`;
+  $('#historial-body').querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
+    const h = S.clinHist[+b.dataset.del];
+    if(!confirm(`¿Quitar "${h.kind || h.name}" del historial? Dejo de usar esos valores.`)) return;
+    S.clinHist.splice(+b.dataset.del, 1); save(); renderHistorial(); toast('Estudio quitado.');
+  });
 }
 function refreshPanels(){ renderPerfil(); renderHistorial(); }
 
 /* ===================== MODAL ===================== */
 function openModal(){
   $('#m-name').value = S.name; $('#m-age').value = S.age; $('#m-goals').value = S.goals;
+  $('#m-weight').value = lastWeight() ? lastWeight().kg : ''; $('#m-height').value = S.height;
   try{ $('#m-key').value = localStorage.getItem(STORE_KEY+'_key') || ''; }catch(_){}
   $('#modal').classList.remove('hidden');
   setTimeout(() => $('#m-name').focus(), 30);
@@ -866,6 +1189,7 @@ function setBusy(b){
   busy = b; updateSend();
   $('#status').innerHTML = b ? '<i class="status-dot"></i>Escribiendo…' : $('#status').innerHTML;
 }
+function setStatusText(t){ $('#status').innerHTML = '<i class="status-dot"></i>' + esc(t); }
 function setStatus(ok){
   $('#status').innerHTML = ok ? '<i class="status-dot"></i>Listo para ayudarte' : '<i class="status-dot err"></i>Sin conexión con el asistente';
 }
@@ -938,6 +1262,10 @@ function init(){
     if(!name){ toast('El nombre no puede quedar vacío.', true); return; }
     if(!age || +age < 1 || +age > 120){ toast('Revisá la edad.', true); return; }
     S.name = name; S.age = age; S.goals = $('#m-goals').value.trim();
+    const wv = $('#m-weight').value.trim(), hv = $('#m-height').value.trim();
+    if(wv && !(lastWeight() && lastWeight().kg === +wv) && !addWeight(wv, 'manual')){ toast('Revisá el peso (entre 25 y 300 kg).', true); return; }
+    if(hv && !setHeight(hv)){ toast('Revisá la altura en cm (ej: 162).', true); return; }
+    if(!hv) S.height = '';
     try{
       const k = $('#m-key').value.trim();
       if(k) localStorage.setItem(STORE_KEY+'_key', k); else localStorage.removeItem(STORE_KEY+'_key');
