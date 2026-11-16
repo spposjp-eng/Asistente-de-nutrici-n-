@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#7a1f2b">
 <title>NutriSalta</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/favicon-64.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="NutriSalta">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
 /* =========================================================
@@ -343,6 +350,25 @@ main{flex:1;overflow:hidden;position:relative}
 .tabs .tab{font-size:var(--fs-sm)}
 @media (max-width:420px){ .energy{grid-template-columns:112px 1fr;gap:14px} .ring,.ring svg{width:112px;height:112px} .ring .center b{font-size:20px} }
 
+/* ---------- Sin conexión / instalación ---------- */
+#btn-install{padding:6px 12px;font-size:var(--fs-xs)}
+.status-dot.off{background:hsl(38 75% 50%)}
+.eng{display:flex;gap:12px;align-items:flex-start;padding:12px 16px;border-top:1px solid var(--line)}
+.eng:first-child{border-top:0}
+.eng .st{flex:none;width:10px;height:10px;border-radius:50%;margin-top:5px;background:var(--line)}
+.eng .st.ok{background:var(--ok)}
+.eng .st.mid{background:hsl(38 75% 50%)}
+.eng .body{flex:1;min-width:0;font-size:var(--fs-sm)}
+.eng .body b{display:block}
+.eng .body span{display:block;color:var(--text-3);font-size:var(--fs-xs)}
+.eng .body ol{margin:8px 0 0;padding-left:18px;color:var(--text-2);font-size:var(--fs-xs)}
+.eng .body ol li{margin:3px 0}
+.eng .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.eng .acts .btn{padding:6px 11px;font-size:var(--fs-xs)}
+.prog{height:6px;border-radius:3px;background:var(--surface-2);margin-top:8px;overflow:hidden}
+.prog i{display:block;height:100%;background:var(--brand);width:0;transition:width .2s}
+.offline-note{font-size:var(--fs-xs);color:var(--text-3);font-style:italic;display:block;margin-bottom:6px}
+
 /* ---------- Modal ---------- */
 .overlay{position:fixed;inset:0;background:hsl(0 0% 0% / .4);display:grid;place-items:center;padding:16px;z-index:50}
 .modal{width:100%;max-width:440px;background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--shadow);max-height:90vh;overflow:auto}
@@ -418,6 +444,9 @@ details.adv .field{margin-top:10px}
         <b>NutriSalta</b>
         <span id="status"><i class="status-dot"></i>Listo para ayudarte</span>
       </div>
+      <button class="btn btn-ghost hidden" id="btn-install" title="Instalar NutriSalta en este dispositivo">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Instalar
+      </button>
       <button class="icon-btn" id="btn-settings" aria-label="Editar mis datos" title="Editar mis datos">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
       </button>
@@ -562,6 +591,7 @@ details.adv .field{margin-top:10px}
   </div>
 </div>
 <input type="file" id="imp-file" accept="application/json,.json" class="hidden">
+<input type="file" id="lm-file" accept=".task,.litertlm,.bin,application/octet-stream" class="hidden">
 <div class="tip hidden" id="tip" role="tooltip"></div>
 
 <div id="toast" role="status" aria-live="polite"></div>
@@ -925,6 +955,7 @@ async function resolveModel(kind){
 const isModelGone = e => e.kind === 'http' && (e.status === 404 || e.status === 400) && /model|decommission|does not exist|not found/i.test(e.detail || '');
 
 async function callGroq(messages, model, opts){
+  if(navigator.onLine === false){ const e = new Error('Sin conexión a internet.'); e.kind = 'network'; throw e; }
   const kind = model === VISION_MODEL ? 'vision' : 'text';
   for(let attempt = 0; attempt < 3; attempt++){
     const real = await resolveModel(kind);
@@ -1047,21 +1078,26 @@ async function send(){
     const messages = [{ role:'system', content:systemPrompt() }, ...ctx];
 
     setStatusText('Escribiendo…');
-    let reply;
-    if(att && att.type === 'img'){
-      reply = await sendWithImage(messages, att.dataUrl);
-    }else{
-      reply = await callGroq(messages, MODEL);
+    let reply, engine = 'groq';
+    try{
+      if(att && att.type === 'img') reply = await sendWithImage(messages, att.dataUrl);
+      else reply = await callGroq(messages, MODEL);
+    }catch(err){
+      if(err.kind !== 'network') throw err;
+      // Sin internet: modelos de Google en el dispositivo (Gemini Nano / Gemma) o respuestas locales
+      const r = await offlineAnswer(ctx, att);
+      reply = r.text; engine = r.engine;
     }
     const mem = absorbMemory(reply);
     typingRow.remove();
     const botMsg = { role:'assistant', content:mem.body, ts:Date.now() };
+    if(engine !== 'groq') botMsg.engine = engine;
     if(att && att.type === 'img') imgCache[botMsg.ts] = { dataUrl: att.dataUrl, text };
     S.msgs.push(botMsg); save();
     renderMsg(botMsg);
     const all = [...new Set([...learned, ...mem.found])];
     if(all.length) toast('Lo anoto: ' + all.join(' · '));
-    setStatus(true);
+    setStatus(engine === 'groq' ? true : 'offline');
   }catch(err){
     typingRow.remove();
     renderError(err.message);
@@ -1090,7 +1126,13 @@ async function processPdf(att, text){
   try{
     st = await analyzeStudy(att.text, att.name);
   }catch(err){
-    if(err.kind === 'network') throw err;
+    if(err.kind === 'network'){
+      // Sin conexión: lo guardo y lo analizo apenas vuelva internet
+      S.clinHist.push(Object.assign(entry, { isStudy:true, pending:true, kind:'Estudio (se analiza al volver internet)', values:[], summary:'', rawText: att.text }));
+      save();
+      toast('Sin conexión: guardé el PDF y lo analizo cuando vuelva internet.');
+      return `[El usuario subió un estudio (${att.name}) pero no hay conexión para analizarlo. Quedó guardado.]` + (text ? '\n' + text : '');
+    }
     console.warn('[NutriSalta] No se pudo estructurar el estudio, mando el texto crudo:', err);
     S.clinHist.push(Object.assign(entry, { isStudy:true, kind:'Estudio', values:[], summary:'' }));
     return rawPdfMessage(att, text);
@@ -1252,7 +1294,7 @@ function renderMsg(m, imgUrl, noScroll){
   }else{
     inner = md(m.content);
   }
-  inner += `<span class="meta">${fmtTime(m.ts)}</span>`;
+  inner += `<span class="meta">${fmtTime(m.ts)}${m.engine ? ' · sin conexión (' + esc(ENGINE_NAMES[m.engine] || m.engine) + ')' : ''}</span>`;
   if(m.role !== 'user' && imgCache[m.ts]) inner += `<div class="bot-actions"><button class="btn btn-ghost" data-logimg="${m.ts}">Anotar este plato en el diario</button></div>`;
   row.innerHTML = (m.role === 'user' ? '' : '<div class="avatar" aria-hidden="true">NS</div>') + `<div class="bubble">${inner}</div>`;
   const lb = row.querySelector('[data-logimg]');
@@ -1364,6 +1406,8 @@ function renderPerfil(){
       <button class="btn btn-ghost" id="p-clear">Borrar conversación</button>
       <button class="btn btn-danger" id="p-reset">Empezar de cero</button>
     </div>
+    <h2 class="sec-title">Instalar y usar sin internet</h2>
+    <div class="card" id="offline-box"><div class="blank">Revisando tu dispositivo…</div></div>
     <h2 class="sec-title">Tus datos son tuyos</h2>
     <p class="hint" style="margin:0 2px 10px">Todo queda guardado solo en este dispositivo. Descargá una copia para no perderla o para pasarla a otro teléfono.</p>
     <div class="actions" style="margin-top:0">
@@ -1371,6 +1415,7 @@ function renderPerfil(){
       <button class="btn btn-ghost" id="p-import">Restaurar copia</button>
     </div>`;
   if($('#w-chart')) drawWeightChart($('#w-chart'), S.weightLog, S.weightGoal);
+  renderOffline();
   $('#p-export').onclick = exportData;
   $('#p-import').onclick = () => $('#imp-file').click();
   $('#perfil-body').querySelectorAll('[data-fact]').forEach(b => b.onclick = () => {
@@ -1403,6 +1448,7 @@ function renderHistorial(){
         </div>
         <button class="icon-btn" data-del="${h.i}" aria-label="Quitar este estudio" title="Quitar del historial"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
       </header>
+      ${h.pending ? `<p class="study-sum hint">Lo guardé sin conexión. Lo analizo apenas vuelva internet.</p>` : ''}
       ${h.summary ? `<p class="study-sum">${esc(h.summary)}</p>` : ''}
       ${vals.length ? `
         <details class="vals" ${fuera ? '' : ''}>
@@ -1413,7 +1459,7 @@ function renderHistorial(){
             <td class="ref">${v.referencia ? esc(v.referencia) : ''}</td>
             <td>${estadoTxt[v.estado] ? `<span class="pill ${v.estado==='normal'?'ok':'warn'}">${estadoTxt[v.estado]}</span>` : ''}</td>
           </tr>`).join('')}</tbody></table>
-        </details>` : `<p class="study-sum hint">No pude leer valores de este PDF; igual lo tengo en cuenta.</p>`}
+        </details>` : h.pending ? '<div style="height:14px"></div>' : `<p class="study-sum hint">No pude leer valores de este PDF; igual lo tengo en cuenta.</p>`}
     </article>`;
   };
   const list = studies.length
@@ -1741,6 +1787,16 @@ async function estimateNow(){
   }
 }
 async function estimateFood(text, dataUrl){
+  try{
+    return await estimateFoodOnline(text, dataUrl);
+  }catch(err){
+    if(err.kind !== 'network') throw err;
+    const items = text ? localEstimate(text) : [];
+    if(items.length){ toast('Sin conexión: estimación aproximada con la tabla de alimentos del teléfono.'); return items; }
+    throw new Error(text ? 'Sin conexión no reconozco ese plato. Sumalo a mano con nombre y calorías.' : 'Sin conexión no puedo ver la foto. Escribí qué comiste.');
+  }
+}
+async function estimateFoodOnline(text, dataUrl){
   const instr = `Estimá la información nutricional de lo que comió ${S.name}${text ? ': "' + text + '"' : ' (ver foto)'}.
 Considerá porciones caseras típicas del noroeste argentino (ej: empanada salteña de carne ≈ 90 g ≈ 200 kcal; porción de locro ≈ 350 g; humita en chala ≈ 250 g).
 Respondé SOLO JSON: {"items":[{"nombre":"Empanada salteña de carne","porcion":"2 unidades","kcal":400,"proteinas_g":18,"carbohidratos_g":40,"grasas_g":18}]}
@@ -1806,6 +1862,278 @@ async function fillModelSelect(){
   $('#m-model-hint').textContent = ids.length ? 'En uso ahora: ' + (manual || auto) : 'No pude consultar los modelos de tu cuenta. Se usa ' + MODEL + '.';
 }
 
+/* ===================== SIN CONEXIÓN (modelos de Google en el dispositivo) =====================
+   Orden de preferencia cuando no hay internet:
+   1) Gemini Nano: el modelo de Google que viene dentro de Chrome (Prompt API), si el equipo lo tiene.
+   2) Gemma (Google) corriendo en el teléfono con MediaPipe LLM Inference + WebGPU. Se descarga una vez.
+   3) Respuestas locales basadas en reglas, siempre disponibles. */
+const ENGINE_NAMES = { nano:'Gemini Nano', gemma:'Gemma', reglas:'respuestas básicas' };
+const GENAI_VER = '0.10.30';
+const GENAI_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-genai@' + GENAI_VER;
+const MODEL_CACHE = 'ns-local-model';
+const MODEL_REQ = './__modelo-local__/gemma.bin';
+const GEMMA_PAGE = 'https://huggingface.co/litert-community/Gemma3-1B-IT';
+const GEMMA_URL_DEFAULT = 'https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/gemma3-1b-it-int4-web.task';
+const local = { llm:null, loading:null, busy:false, dl:null };
+
+const canCache = () => !!(self.caches && /^https?:/.test(location.protocol));
+async function nanoAvailability(){
+  try{ if(!('LanguageModel' in self)) return 'unavailable'; return await LanguageModel.availability({ expectedInputs:[{ type:'text', languages:['es'] }], expectedOutputs:[{ type:'text', languages:['es'] }] }); }
+  catch(_){ try{ return await LanguageModel.availability(); }catch(__){ return 'unavailable'; } }
+}
+async function localModelInfo(){
+  if(!canCache()) return null;
+  try{
+    const r = await (await caches.open(MODEL_CACHE)).match(MODEL_REQ);
+    return r ? { size: +r.headers.get('x-size') || 0, name: r.headers.get('x-name') || 'Gemma' } : null;
+  }catch(_){ return null; }
+}
+async function storeModel(blob, name){
+  try{ if(navigator.storage && navigator.storage.persist) await navigator.storage.persist(); }catch(_){}
+  const c = await caches.open(MODEL_CACHE);
+  await c.put(MODEL_REQ, new Response(blob, { headers:{ 'content-type':'application/octet-stream', 'x-size':String(blob.size), 'x-name':name } }));
+  // Dejo también guardada la librería de MediaPipe para poder cargarla sin internet
+  try{
+    const rt = await caches.open('ns-runtime');
+    await Promise.all(['/genai_bundle.mjs', '/wasm/genai_wasm_internal.js', '/wasm/genai_wasm_internal.wasm',
+      '/wasm/genai_wasm_nosimd_internal.js', '/wasm/genai_wasm_nosimd_internal.wasm'].map(f => rt.add(GENAI_BASE + f).catch(() => {})));
+  }catch(_){}
+  local.llm = null;
+}
+async function downloadModel(url){
+  const res = await fetch(url);
+  if(!res.ok){ const e = new Error('HTTP ' + res.status); e.status = res.status; throw e; }
+  const total = +res.headers.get('content-length') || 0;
+  const reader = res.body.getReader(); const chunks = []; let got = 0;
+  for(;;){
+    const { done, value } = await reader.read(); if(done) break;
+    chunks.push(value); got += value.length;
+    local.dl = { got, total }; paintProgress();
+  }
+  const name = decodeURIComponent(url.split('/').pop().split('?')[0]) || 'gemma.task';
+  await storeModel(new Blob(chunks), name);
+}
+async function loadGemma(){
+  if(local.llm) return local.llm;
+  if(local.loading) return local.loading;
+  local.loading = (async () => {
+    if(!navigator.gpu) throw new Error('Este navegador no tiene WebGPU, que hace falta para correr Gemma.');
+    const r = await (await caches.open(MODEL_CACHE)).match(MODEL_REQ);
+    if(!r) throw new Error('No hay modelo Gemma guardado.');
+    const { FilesetResolver, LlmInference } = await import(GENAI_BASE + '/genai_bundle.mjs');
+    const fileset = await FilesetResolver.forGenAiTasks(GENAI_BASE + '/wasm');
+    local.llm = await LlmInference.createFromOptions(fileset, {
+      baseOptions:{ modelAssetBuffer: r.body.getReader() },
+      maxTokens: 1536, topK: 40, temperature: 0.7, randomSeed: 7
+    });
+    return local.llm;
+  })();
+  try{ return await local.loading; } finally { local.loading = null; }
+}
+function compactSystem(){
+  return `Sos NutriSalta, asistente de nutrición para ${S.name}, ${S.age} años, con artrosis. Hablás de vos, como en Salta, cálido y breve (máximo 120 palabras).
+Objetivos: ${S.goals || 'comer más sano'}.
+${healthContext().slice(0, 1400)}
+Reglas: solo hablás de alimentación, recetas (también del NOA: locro, humita, tamales, empanadas, quínoa), hidratación, ejercicio suave y bienestar. Nunca menciones cáncer, tumores ni enfermedades graves. No asustes. Terminá con un consejo concreto que empiece con "👉".`;
+}
+async function offlineAnswer(ctx, att){
+  const last = ctx[ctx.length - 1];
+  let q = String(last.content || '').slice(0, 1500);
+  if(att && att.type === 'img') q = 'Mandé una foto de mi comida pero no la podés ver sin internet. ' + (last.content.replace(/^\[[^\]]*\]\s*/, '') || '¿Qué me conviene comer?');
+  const hist = ctx.slice(-5, -1).map(m => ({ role:m.role, content:String(m.content).slice(0, 400) }));
+
+  // 1) Gemini Nano (Chrome)
+  try{
+    if(await nanoAvailability() === 'available'){
+      setStatusText('Sin internet · pensando con Gemini Nano…');
+      const ses = await LanguageModel.create({ initialPrompts:[{ role:'system', content:compactSystem() }, ...hist] });
+      const out = await ses.prompt(q);
+      try{ ses.destroy(); }catch(_){}
+      if(out && out.trim()) return { text: out.trim(), engine:'nano' };
+    }
+  }catch(e){ console.warn('[NutriSalta] Gemini Nano falló:', e); }
+
+  // 2) Gemma en el teléfono (MediaPipe)
+  try{
+    if(navigator.gpu && await localModelInfo()){
+      setStatusText('Sin internet · cargando Gemma en el teléfono…');
+      const llm = await loadGemma();
+      setStatusText('Sin internet · pensando con Gemma…');
+      let prompt = '<start_of_turn>user\n' + compactSystem() + '<end_of_turn>\n<start_of_turn>model\nDale, entendido.<end_of_turn>\n';
+      hist.forEach(m => { prompt += `<start_of_turn>${m.role === 'user' ? 'user' : 'model'}\n${m.content}<end_of_turn>\n`; });
+      prompt += `<start_of_turn>user\n${q}<end_of_turn>\n<start_of_turn>model\n`;
+      const out = await llm.generateResponse(prompt);
+      if(out && out.trim()) return { text: out.replace(/<end_of_turn>[\s\S]*$/, '').trim(), engine:'gemma' };
+    }
+  }catch(e){ console.warn('[NutriSalta] Gemma local falló:', e); }
+
+  // 3) Reglas
+  return { text: ruleAnswer(q, att), engine:'reglas' };
+}
+
+/* --- Respuestas básicas sin modelo --- */
+const RULES = [
+  [/^(hola|buen[oa]s|qu[eé] tal)/i, n => `¡Hola, ${n}! Ahora estoy sin internet, pero igual te acompaño con lo básico. Podés anotar tus comidas, el agua y cómo te sentís en la pestaña Hoy.\n\n👉 Arrancá con un vaso de agua ahora mismo.`],
+  [/locro/i, () => `El locro puede ser parte de una dieta amiga de las articulaciones si lo alivianás:\n- Más zapallo, porotos y maíz; menos panceta y chorizo.\n- Usá carne magra (roast beef o pecho desgrasado).\n- Porción de un plato hondo, sin repetir.\n\n👉 Sumale verdeo fresco por arriba y acompañalo con una ensalada de hojas verdes.`],
+  [/empanad/i, () => `Una empanada salteña de carne tiene unas 200 kcal. Para disfrutarla sin pasarte:\n- 2 o 3 unidades, mejor al horno que fritas.\n- Acompañá con ensalada de tomate y cebolla.\n- Si son de pollo o verdura, mejor todavía.\n\n👉 Comelas despacio y tomá agua en vez de gaseosa.`],
+  [/humita|tamal/i, () => `Humita y tamales son ricos en maíz, que da energía. Para que te caigan bien:\n- Una humita en chala o un tamal por comida.\n- Poco queso agregado.\n- Completá el plato con verduras.\n\n👉 Si es a la noche, elegí la humita en chala: es más liviana que la cazuela.`],
+  [/desayun/i, () => `Ideas de desayuno para cuidar las articulaciones:\n- Avena con leche o yogur y una fruta.\n- Pan integral con quesillo o queso fresco y tomate.\n- Infusión con poco azúcar.\n\n👉 Sumá una porción de lácteo: el calcio cuida tus huesos.`],
+  [/cena|noche/i, () => `Para la cena, algo liviano:\n- Verduras al horno con un huevo o pollo.\n- Sopa de verduras con quínoa.\n- Tortilla de zapallitos.\n\n👉 Cená al menos dos horas antes de acostarte.`],
+  [/agua|hidrat|tomar/i, () => `La hidratación ayuda a que el cartílago se mantenga mejor:\n- Apuntá a 8 vasos por día.\n- Infusiones sin azúcar también suman.\n- Tené una botella a mano.\n\n👉 Marcá cada vaso en la pestaña Hoy.`],
+  [/dolor|rodilla|cadera|articula|inflam/i, () => `Para acompañar las articulaciones desde la comida:\n- Pescado, nueces o semillas de chía (omega-3).\n- Frutas y verduras de colores todos los días.\n- Menos ultraprocesados, fiambres y frituras.\n- Mantener un peso saludable alivia rodillas y caderas.\n\n👉 Si el dolor aumenta, comentalo con tu médico en el próximo control.`],
+  [/ejercicio|camin|movim|actividad/i, () => `Movimientos suaves que hacen bien:\n- Caminar 20–30 minutos en terreno plano.\n- Bici fija o pileta, si tenés acceso.\n- Estiramientos suaves al levantarte.\n\n👉 Mejor poquito todos los días que mucho un solo día.`],
+  [/az[uú]car|gluc|diabet/i, () => `Para cuidar el azúcar en sangre:\n- Preferí integrales y legumbres.\n- Fruta entera en vez de jugo.\n- Combiná harinas con verdura y proteína.\n\n👉 Cambiá la gaseosa por agua con limón.`],
+  [/colest|grasa|triglic/i, () => `Para el colesterol:\n- Aceite crudo de oliva o girasol alto oleico.\n- Legumbres 2 o 3 veces por semana.\n- Menos manteca, fiambres y carnes grasas.\n\n👉 Sumá una cucharada de avena a tu desayuno.`],
+  [/peso|bajar|adelgaz/i, () => `Para bajar de peso cuidando las articulaciones:\n- Mitad del plato con verduras.\n- Porciones medianas, sin repetir.\n- Agua en lugar de bebidas azucaradas.\n\n👉 Anotá lo que comés en la pestaña Hoy: ayuda mucho a ver el día completo.`],
+  [/receta|cocin|prepar/i, () => `Una receta fácil: guiso de quínoa con verduras.\n- Rehogá cebolla, morrón y zapallo.\n- Agregá 1 taza de quínoa lavada y 2 de caldo.\n- Cociná 15 minutos y sumá arvejas.\n\n👉 Hacé de más y guardá porciones para otro día.`]
+];
+function ruleAnswer(q, att){
+  const note = '_Sin internet: te doy una respuesta corta. Cuando vuelva la conexión puedo darte más detalle._\n\n';
+  if(att && att.type === 'img') return note + `Sin conexión no puedo ver la foto. Contame qué plato es y lo anotamos en la pestaña Hoy.\n\n👉 Mientras tanto: que la mitad del plato sean verduras.`;
+  const hit = RULES.find(([re]) => re.test(q));
+  return note + (hit ? hit[1](S.name) : `Ahora no tengo internet para responderte bien eso. Mientras tanto podés anotar tus comidas, el agua y cómo te sentís en la pestaña Hoy, y lo charlamos cuando vuelva la conexión.\n\n👉 Un consejo para hoy: tomá agua y sumá una verdura más en tu próxima comida.`);
+}
+
+/* --- Tabla local de alimentos (estimación sin conexión) --- */
+const FOODS = [
+  [/empanad/, 'Empanada salteña', 'unidad', 200, 9, 20, 9], [/humita/, 'Humita en chala', 'unidad', 280, 7, 45, 8],
+  [/tamal/, 'Tamal', 'unidad', 300, 11, 32, 14], [/locro/, 'Locro', 'plato', 450, 22, 50, 17],
+  [/guiso/, 'Guiso', 'plato', 420, 20, 55, 13], [/mondongo/, 'Mondongo', 'plato', 380, 25, 30, 16],
+  [/milanes/, 'Milanesa', 'unidad', 300, 22, 15, 17], [/asado|carne/, 'Carne asada', 'porción 150 g', 330, 38, 0, 19],
+  [/pollo/, 'Pollo', 'porción 150 g', 250, 38, 0, 10], [/pescado|merluza|trucha/, 'Pescado', 'porción 150 g', 180, 33, 0, 5],
+  [/huevo/, 'Huevo', 'unidad', 75, 6, 1, 5], [/pizza/, 'Pizza', 'porción', 270, 11, 32, 11],
+  [/fideo|pasta|ñoqui/, 'Fideos', 'plato', 380, 13, 72, 4], [/arroz/, 'Arroz', 'plato', 240, 5, 52, 1],
+  [/qu[ií]noa/, 'Quínoa', 'taza', 220, 8, 39, 4], [/papa|pur[eé]/, 'Papa', 'porción', 160, 4, 36, 0],
+  [/ensalada/, 'Ensalada', 'plato', 80, 2, 8, 4], [/verdura|zapall|br[oó]coli|acelga/, 'Verduras', 'plato', 70, 3, 12, 1],
+  [/sopa/, 'Sopa de verduras', 'plato', 120, 4, 18, 3], [/pan\b|pancito|tostada/, 'Pan', 'unidad', 130, 4, 25, 1],
+  [/factura|medialuna/, 'Medialuna', 'unidad', 180, 3, 22, 9], [/galleta/, 'Galletas', 'porción', 140, 2, 20, 6],
+  [/queso|quesillo/, 'Queso', 'porción 30 g', 100, 7, 1, 8], [/yogur/, 'Yogur', 'pote', 120, 6, 16, 3],
+  [/leche/, 'Leche', 'taza', 120, 8, 12, 4], [/avena/, 'Avena', '3 cucharadas', 110, 4, 19, 2],
+  [/banana/, 'Banana', 'unidad', 105, 1, 27, 0], [/manzana|naranja|pera|fruta|mandarina/, 'Fruta', 'unidad', 70, 1, 18, 0],
+  [/mate|caf[eé]|t[eé]\b/, 'Infusión', 'taza', 10, 0, 2, 0], [/gaseosa/, 'Gaseosa', 'vaso', 100, 0, 26, 0],
+  [/vino/, 'Vino', 'copa', 125, 0, 4, 0], [/cerveza/, 'Cerveza', 'vaso', 150, 1, 13, 0],
+  [/api|mazamorra/, 'Api / mazamorra', 'taza', 180, 4, 38, 2], [/arrope|dulce/, 'Dulce / arrope', 'cucharada', 60, 0, 15, 0],
+  [/charqui/, 'Charqui', 'porción 50 g', 150, 30, 0, 3], [/cabrito|llama/, 'Carne de cabrito/llama', 'porción 150 g', 260, 36, 0, 12]
+];
+const WORDNUM = { un:1, una:1, uno:1, dos:2, tres:3, cuatro:4, cinco:5, media:0.5, medio:0.5 };
+function localEstimate(text){
+  const parts = text.toLowerCase().split(/,| y | con |\+|\n/).map(x => x.trim()).filter(Boolean);
+  const out = [];
+  parts.forEach(part => {
+    const f = FOODS.find(([re]) => re.test(part)); if(!f) return;
+    const m = part.match(/(\d+(?:[.,]\d)?)/); const w = part.match(/\b(un|una|uno|dos|tres|cuatro|cinco|media|medio)\b/);
+    const n = m ? parseFloat(m[1].replace(',', '.')) : w ? WORDNUM[w[1]] : 1;
+    const k = Math.min(10, Math.max(0.5, n));
+    const plural = { unidad:'unidades', plato:'platos', taza:'tazas', vaso:'vasos', copa:'copas', pote:'potes', porción:'porciones', cucharada:'cucharadas' }[f[2]];
+    const qty = k === 1 ? '1 ' + f[2] : plural ? k.toLocaleString('es-AR') + ' ' + plural : k.toLocaleString('es-AR') + ' × ' + f[2];
+    out.push({ name:f[1], qty, kcal:Math.round(f[3]*k), p:Math.round(f[4]*k), c:Math.round(f[5]*k), f:Math.round(f[6]*k) });
+  });
+  return out;
+}
+
+/* --- Estudios pendientes: se analizan al volver internet --- */
+async function processPendingStudies(){
+  if(navigator.onLine === false) return;
+  const pend = S.clinHist.filter(h => h.pending && h.rawText);
+  for(const h of pend){
+    try{
+      const st = await analyzeStudy(h.rawText, h.name);
+      Object.assign(h, { isStudy: st.isStudy, kind: st.kind, studyDate: st.studyDate, lab: st.lab, values: st.values, summary: st.summary });
+      delete h.pending; delete h.rawText;
+      if(st.weight) addWeight(st.weight, 'pdf', st.studyDate || undefined);
+      save(); refreshPanels();
+      toast(`Analicé tu ${st.kind.toLowerCase()} pendiente: ${st.values.length} valores guardados.`);
+    }catch(e){ if(e.kind === 'network') return; console.warn('[NutriSalta] Estudio pendiente falló:', e); }
+  }
+}
+
+/* --- PWA: instalación --- */
+let installEvt = null;
+const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+async function doInstall(){
+  if(!installEvt) return;
+  installEvt.prompt();
+  const r = await installEvt.userChoice;
+  installEvt = null; $('#btn-install').classList.add('hidden');
+  if(r && r.outcome === 'accepted') toast('¡Listo! NutriSalta quedó instalada.');
+  renderOffline();
+}
+function paintProgress(){
+  const el = $('#lm-prog'); if(!el || !local.dl) return;
+  const { got, total } = local.dl;
+  el.classList.remove('hidden');
+  el.querySelector('i').style.width = total ? (got/total*100).toFixed(1) + '%' : '30%';
+  const t = $('#lm-prog-t'); if(t) t.textContent = `Descargando… ${(got/1048576).toFixed(0)}${total ? ' de ' + (total/1048576).toFixed(0) : ''} MB`;
+}
+async function renderOffline(){
+  const box = $('#offline-box'); if(!box) return;
+  const nano = await nanoAvailability();
+  const info = await localModelInfo();
+  const gpu = !!navigator.gpu, cache = canCache();
+  const web = /^https?:/.test(location.protocol);
+  let inst;
+  if(isStandalone()) inst = `<div class="st ok"></div><div class="body"><b>App instalada</b><span>Ya la estás usando como app.</span></div>`;
+  else if(installEvt) inst = `<div class="st mid"></div><div class="body"><b>Instalar en este dispositivo</b><span>Queda como un ícono en tu pantalla de inicio y abre sin barra del navegador.</span><div class="acts"><button class="btn btn-primary" id="o-install">Instalar NutriSalta</button></div></div>`;
+  else if(isIOS()) inst = `<div class="st mid"></div><div class="body"><b>Instalar en iPhone</b><ol><li>Abrí esta página en <b style="display:inline">Safari</b>.</li><li>Tocá el botón Compartir (el cuadrado con la flecha).</li><li>Elegí <b style="display:inline">Agregar a inicio</b>.</li></ol></div>`;
+  else if(!web) inst = `<div class="st"></div><div class="body"><b>Instalar como app</b><span>Abrí NutriSalta desde su dirección web (no desde un archivo descargado) para poder instalarla.</span></div>`;
+  else inst = `<div class="st mid"></div><div class="body"><b>Instalar como app</b><span>En Chrome: menú ⋮ → <b style="display:inline">Instalar app</b> o <b style="display:inline">Agregar a la pantalla principal</b>.</span></div>`;
+
+  const nanoTxt = { available:['ok','Lista para usar sin internet.'], downloadable:['mid','Chrome puede descargarla (unos 2 GB, solo una vez).'], downloading:['mid','Chrome la está descargando…'], unavailable:['','No está disponible en este equipo o navegador.'] }[nano] || ['', 'No está disponible.'];
+  let gem;
+  if(info) gem = `<div class="st ok"></div><div class="body"><b>Gemma en el teléfono</b><span>Instalado: ${esc(info.name)}${info.size ? ' · ' + (info.size/1048576).toFixed(0) + ' MB' : ''}.${gpu ? '' : ' Este navegador no tiene WebGPU, así que no lo puede usar.'}</span>
+      <div class="acts"><button class="btn btn-ghost" id="o-test">Probar</button><button class="btn btn-ghost" id="o-del">Borrar</button></div></div>`;
+  else if(!cache) gem = `<div class="st"></div><div class="body"><b>Gemma en el teléfono</b><span>Disponible al abrir la app desde su dirección web.</span></div>`;
+  else gem = `<div class="st"></div><div class="body"><b>Gemma en el teléfono</b><span>Modelo de Google que responde sin internet${gpu ? '' : ' (este navegador no tiene WebGPU: probá con Chrome actualizado)'}. Ocupa unos 550 MB y se descarga una sola vez, con Wi-Fi.</span>
+      <div class="acts"><button class="btn btn-primary" id="o-dl">Descargar Gemma</button><button class="btn btn-ghost" id="o-file">Cargar archivo</button></div>
+      <div class="prog hidden" id="lm-prog"><i></i></div><span id="lm-prog-t"></span>
+      <ol><li>Si la descarga directa falla, abrí <a href="${GEMMA_PAGE}" target="_blank" rel="noopener">la página de Gemma en Hugging Face</a>, iniciá sesión y aceptá la licencia de Google.</li>
+      <li>Descargá un archivo que termine en <b style="display:inline">-web.task</b> (por ejemplo <code>gemma3-1b-it-int4-web.task</code>).</li>
+      <li>Volvé acá y tocá <b style="display:inline">Cargar archivo</b>.</li></ol></div>`;
+
+  box.innerHTML = `<div class="eng">${inst}</div>
+    <div class="eng"><div class="st ok"></div><div class="body"><b>Sin internet funciona</b><span>Diario, agua, bienestar, historial y respuestas básicas. Los PDFs se analizan cuando vuelve la conexión.</span></div></div>
+    <div class="eng"><div class="st ${nanoTxt[0]}"></div><div class="body"><b>Gemini Nano (Chrome)</b><span>${nanoTxt[1]}</span>${nano === 'downloadable' ? '<div class="acts"><button class="btn btn-ghost" id="o-nano">Activar</button></div>' : ''}</div></div>
+    <div class="eng">${gem}</div>`;
+
+  const on = (id, fn) => { const b = $('#' + id); if(b) b.onclick = fn; };
+  on('o-install', doInstall);
+  on('o-nano', async () => {
+    try{
+      toast('Chrome empieza a descargar Gemini Nano. Puede tardar.');
+      const ses = await LanguageModel.create({ monitor(m){ m.addEventListener('downloadprogress', e => setStatusText('Descargando Gemini Nano… ' + Math.round(e.loaded * 100) + '%')); } });
+      try{ ses.destroy(); }catch(_){}
+      toast('Gemini Nano listo para usar sin internet.'); setStatus(true);
+    }catch(e){ console.warn(e); toast('No se pudo activar Gemini Nano en este equipo.', true); }
+    renderOffline();
+  });
+  on('o-dl', async () => {
+    const b = $('#o-dl'); b.disabled = true; b.textContent = 'Descargando…';
+    try{
+      await downloadModel(GEMMA_URL_DEFAULT);
+      toast('Gemma quedó guardado. Ya podés usarlo sin internet.');
+    }catch(e){
+      console.error('[NutriSalta] Descarga de Gemma falló:', e);
+      toast(e.status === 401 || e.status === 403 ? 'Hugging Face pide iniciar sesión para bajar Gemma. Seguí los pasos de abajo.' : 'No se pudo descargar Gemma. Seguí los pasos de abajo para cargarlo a mano.', true);
+    }
+    local.dl = null; renderOffline();
+  });
+  on('o-file', () => $('#lm-file').click());
+  on('o-del', async () => {
+    if(!confirm('¿Borrar el modelo Gemma del teléfono? Libera espacio; lo podés volver a cargar después.')) return;
+    await caches.delete(MODEL_CACHE); local.llm = null; toast('Modelo borrado.'); renderOffline();
+  });
+  on('o-test', async () => {
+    const b = $('#o-test'); b.disabled = true; b.textContent = 'Cargando…';
+    try{
+      const llm = await loadGemma();
+      const out = await llm.generateResponse('<start_of_turn>user\nDecime en una frase un consejo para el desayuno.<end_of_turn>\n<start_of_turn>model\n');
+      toast('Gemma responde: ' + out.trim().slice(0, 120));
+    }catch(e){ console.error(e); toast('Gemma no pudo arrancar: ' + e.message, true); }
+    b.disabled = false; b.textContent = 'Probar';
+  });
+}
+
 /* ===================== MODAL ===================== */
 function openModal(){
   $('#m-name').value = S.name; $('#m-age').value = S.age; $('#m-goals').value = S.goals;
@@ -1836,7 +2164,8 @@ function setBusy(b){
 }
 function setStatusText(t){ $('#status').innerHTML = '<i class="status-dot"></i>' + esc(t); }
 function setStatus(ok){
-  $('#status').innerHTML = ok ? '<i class="status-dot"></i>Listo para ayudarte' : '<i class="status-dot err"></i>Sin conexión con el asistente';
+  if(ok === 'offline' || navigator.onLine === false){ $('#status').innerHTML = '<i class="status-dot off"></i>Sin internet · modo local'; return; }
+  $('#status').innerHTML = ok ? '<i class="status-dot"></i>Listo para ayudarte' : '<i class="status-dot err"></i>No pude conectar con el asistente';
 }
 function updateSend(){ $('#send').disabled = busy || (!$('#txt').value.trim() && !pending); }
 function autosize(){ const t = $('#txt'); t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 140) + 'px'; }
@@ -1949,7 +2278,33 @@ function init(){
   };
 
   if(!apiKey()) $('#s-key-wrap').classList.remove('hidden');
-  if(S.name){ showApp(); } else { $('#setup').classList.remove('hidden'); $('#s-name').focus(); }
+  // PWA
+  if('serviceWorker' in navigator && /^https?:/.test(location.protocol)){
+    navigator.serviceWorker.register('./sw.js').catch(e => console.warn('[NutriSalta] No se pudo registrar el service worker:', e));
+  }
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault(); installEvt = e;
+    if(!isStandalone()) $('#btn-install').classList.remove('hidden');
+    renderOffline();
+  });
+  window.addEventListener('appinstalled', () => { $('#btn-install').classList.add('hidden'); installEvt = null; renderOffline(); });
+  $('#btn-install').onclick = doInstall;
+  $('#lm-file').onchange = async e => {
+    const f = e.target.files[0]; e.target.value = ''; if(!f) return;
+    if(!/\.(task|litertlm|bin)$/i.test(f.name)){ toast('Elegí el archivo del modelo (termina en .task).', true); return; }
+    toast('Guardando el modelo en el teléfono…');
+    try{ await storeModel(f, f.name); toast('Gemma quedó guardado. Ya podés usarlo sin internet.'); }
+    catch(err){ console.error(err); toast('No pude guardar el modelo. ¿Hay espacio suficiente?', true); }
+    renderOffline();
+  };
+  window.addEventListener('online', () => { setStatus(true); toast('Volvió la conexión.'); processPendingStudies(); });
+  window.addEventListener('offline', () => { setStatus('offline'); toast('Sin internet: sigo funcionando en modo local.'); });
+
+  if(S.name){
+    showApp();
+    if(navigator.onLine === false) setStatus('offline'); else processPendingStudies();
+    if(location.hash === '#hoy') switchTab('hoy');
+  } else { $('#setup').classList.remove('hidden'); $('#s-name').focus(); }
 }
 init();
 </script>
