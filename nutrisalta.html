@@ -1,0 +1,956 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#7a1f2b">
+<title>NutriSalta</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+/* =========================================================
+   SEMILLA DE DISEÑO
+   Todo el sistema de color se deriva de dos tonos semilla:
+   --seed-h  : rojo poncho salteño (marca, acciones)
+   --seed2-h : verde cardón (estados positivos, nutrición)
+   Cambiando estos dos números se re-tematiza la app entera.
+   ========================================================= */
+:root{
+  --seed-h: 352;
+  --seed-s: 58%;
+  --seed2-h: 150;
+  --neutral-h: 30;
+
+  /* Marca */
+  --brand:        hsl(var(--seed-h) var(--seed-s) 30%);
+  --brand-hover:  hsl(var(--seed-h) var(--seed-s) 24%);
+  --brand-soft:   hsl(var(--seed-h) 45% 95%);
+  --brand-line:   hsl(var(--seed-h) 35% 86%);
+  --on-brand:     #fff;
+
+  /* Acento cardón */
+  --ok:           hsl(var(--seed2-h) 32% 32%);
+  --ok-soft:      hsl(var(--seed2-h) 28% 94%);
+
+  /* Neutros (levemente cálidos, tono adobe) */
+  --bg:           hsl(var(--neutral-h) 14% 97%);
+  --surface:      #ffffff;
+  --surface-2:    hsl(var(--neutral-h) 12% 94.5%);
+  --line:         hsl(var(--neutral-h) 10% 87%);
+  --text:         hsl(var(--neutral-h) 12% 13%);
+  --text-2:       hsl(var(--neutral-h) 7% 38%);
+  --text-3:       hsl(var(--neutral-h) 6% 55%);
+  --danger:       hsl(8 70% 42%);
+
+  /* Tipo: stack de sistema, sin fuentes "de IA" */
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --fs-xs: 12px; --fs-sm: 13.5px; --fs-md: 15px; --fs-lg: 18px; --fs-xl: 22px;
+
+  --r-sm: 8px; --r-md: 12px; --r-lg: 18px;
+  --shadow: 0 1px 2px hsl(var(--neutral-h) 20% 20% / .06), 0 4px 16px hsl(var(--neutral-h) 20% 20% / .06);
+  --maxw: 760px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --brand:        hsl(var(--seed-h) 55% 62%);
+    --brand-hover:  hsl(var(--seed-h) 60% 70%);
+    --brand-soft:   hsl(var(--seed-h) 25% 18%);
+    --brand-line:   hsl(var(--seed-h) 20% 28%);
+    --on-brand:     hsl(var(--seed-h) 40% 10%);
+    --ok:           hsl(var(--seed2-h) 35% 62%);
+    --ok-soft:      hsl(var(--seed2-h) 20% 16%);
+    --bg:           hsl(var(--neutral-h) 8% 9%);
+    --surface:      hsl(var(--neutral-h) 7% 12.5%);
+    --surface-2:    hsl(var(--neutral-h) 6% 16%);
+    --line:         hsl(var(--neutral-h) 6% 22%);
+    --text:         hsl(var(--neutral-h) 10% 92%);
+    --text-2:       hsl(var(--neutral-h) 6% 70%);
+    --text-3:       hsl(var(--neutral-h) 5% 52%);
+    --danger:       hsl(8 70% 64%);
+  }
+}
+
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font:var(--fs-md)/1.5 var(--font);-webkit-font-smoothing:antialiased}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:6px}
+.hidden{display:none !important}
+svg{display:block}
+
+/* Firma: guarda del poncho salteño (rojo + franjas negras) */
+.guarda{height:6px;background:
+  linear-gradient(to bottom,
+    var(--brand) 0 2px, #111 2px 3px, var(--brand) 3px 4px, #111 4px 5px, var(--brand) 5px 6px);}
+
+/* ---------- Botones ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid transparent;
+  border-radius:var(--r-sm);padding:10px 16px;font-size:var(--fs-sm);font-weight:600;transition:background .15s,border-color .15s}
+.btn-primary{background:var(--brand);color:var(--on-brand)}
+.btn-primary:hover{background:var(--brand-hover)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.btn-ghost{background:transparent;border-color:var(--line);color:var(--text)}
+.btn-ghost:hover{background:var(--surface-2)}
+.btn-danger{background:transparent;border-color:var(--line);color:var(--danger)}
+.icon-btn{width:40px;height:40px;display:grid;place-items:center;border:0;background:transparent;border-radius:10px;color:var(--text-2)}
+.icon-btn:hover{background:var(--surface-2);color:var(--text)}
+.icon-btn svg{width:20px;height:20px}
+
+/* ---------- Form ---------- */
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.field label{font-size:var(--fs-sm);font-weight:600;color:var(--text-2)}
+.field input,.field textarea{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 12px;outline:none;resize:vertical}
+.field input:focus,.field textarea:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.hint{font-size:var(--fs-xs);color:var(--text-3)}
+
+/* ---------- Setup ---------- */
+#setup{min-height:100%;display:flex;flex-direction:column}
+.setup-wrap{flex:1;display:grid;place-items:center;padding:24px 16px}
+.setup-card{width:100%;max-width:420px}
+.setup-brand{display:flex;align-items:center;gap:10px;margin-bottom:28px}
+.logo{width:36px;height:36px;border-radius:10px;background:var(--brand);color:var(--on-brand);display:grid;place-items:center;font-weight:800;letter-spacing:-.5px}
+.setup-card h1{font-size:26px;line-height:1.2;margin:0 0 8px;letter-spacing:-.4px}
+.setup-card p.lead{color:var(--text-2);margin:0 0 24px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 11px;font-size:var(--fs-xs);color:var(--text-2)}
+.chip:hover{border-color:var(--brand);color:var(--brand)}
+.chip.on{background:var(--brand-soft);border-color:var(--brand-line);color:var(--brand)}
+
+/* ---------- App shell ---------- */
+#app{height:100%;display:flex;flex-direction:column}
+.topbar{background:var(--surface);border-bottom:1px solid var(--line)}
+.topbar-in{max-width:var(--maxw);margin:0 auto;display:flex;align-items:center;gap:12px;padding:10px 16px}
+.topbar .who{flex:1;min-width:0}
+.topbar .who b{display:block;font-size:var(--fs-md)}
+.topbar .who span{display:block;font-size:var(--fs-xs);color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);margin-right:5px;vertical-align:1px}
+.status-dot.err{background:var(--danger)}
+
+.tabs{max-width:var(--maxw);margin:0 auto;display:flex;padding:0 8px}
+.tab{flex:1;background:none;border:0;padding:10px 4px 12px;font-size:var(--fs-sm);font-weight:600;color:var(--text-3);border-bottom:2px solid transparent}
+.tab[aria-selected="true"]{color:var(--brand);border-bottom-color:var(--brand)}
+.tab:hover{color:var(--text)}
+
+main{flex:1;overflow:hidden;position:relative}
+.panel{position:absolute;inset:0;overflow-y:auto}
+.panel-in{max-width:var(--maxw);margin:0 auto;padding:20px 16px 32px}
+
+/* ---------- Chat ---------- */
+#chat-panel{display:flex;flex-direction:column}
+#msgs{flex:1;overflow-y:auto;scroll-behavior:smooth}
+#msgs .panel-in{display:flex;flex-direction:column;gap:14px}
+.row{display:flex;gap:10px;align-items:flex-end;max-width:100%}
+.row.user{justify-content:flex-end}
+.avatar{flex:none;width:28px;height:28px;border-radius:8px;background:var(--brand);color:var(--on-brand);display:grid;place-items:center;font-size:11px;font-weight:800}
+.bubble{max-width:min(82%,560px);padding:10px 14px;border-radius:var(--r-lg);word-wrap:break-word;overflow-wrap:anywhere}
+.row.bot .bubble{background:var(--surface);border:1px solid var(--line);border-bottom-left-radius:6px}
+.row.user .bubble{background:var(--brand);color:var(--on-brand);border-bottom-right-radius:6px}
+.row.error .bubble{background:transparent;border:1px dashed var(--danger);color:var(--danger);font-size:var(--fs-sm)}
+.bubble p{margin:0 0 8px}.bubble p:last-child{margin-bottom:0}
+.bubble ul,.bubble ol{margin:4px 0 8px;padding-left:20px}
+.bubble li{margin:2px 0}
+.bubble h4{margin:10px 0 4px;font-size:var(--fs-md)}
+.bubble strong{font-weight:650}
+.bubble .meta{display:block;margin-top:6px;font-size:11px;opacity:.65;font-family:var(--mono)}
+.att-tag{display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-xs);padding:3px 8px;border-radius:6px;background:hsl(0 0% 100% / .18);margin-bottom:6px}
+.att-tag svg{width:13px;height:13px}
+.bubble img.thumb{display:block;max-width:220px;max-height:220px;border-radius:10px;margin-bottom:6px;object-fit:cover}
+
+.typing{display:inline-flex;gap:4px;padding:4px 2px}
+.typing i{width:7px;height:7px;border-radius:50%;background:var(--text-3);animation:blink 1.2s infinite both}
+.typing i:nth-child(2){animation-delay:.18s}.typing i:nth-child(3){animation-delay:.36s}
+@keyframes blink{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
+
+.empty{text-align:center;padding:36px 8px 8px;color:var(--text-2)}
+.empty h2{font-size:var(--fs-xl);color:var(--text);margin:0 0 6px;letter-spacing:-.3px}
+.empty p{margin:0 auto 20px;max-width:420px;font-size:var(--fs-sm)}
+.starters{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;text-align:left}
+.starter{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:12px 14px;font-size:var(--fs-sm);color:var(--text)}
+.starter:hover{border-color:var(--brand-line);background:var(--brand-soft)}
+.starter small{display:block;color:var(--text-3);font-size:var(--fs-xs);margin-bottom:2px}
+
+/* ---------- Composer ---------- */
+.composer{background:var(--surface);border-top:1px solid var(--line);padding:8px 0 calc(8px + env(safe-area-inset-bottom))}
+.composer-in{max-width:var(--maxw);margin:0 auto;padding:0 12px}
+.preview{display:flex;align-items:center;gap:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-md);padding:8px 8px 8px 10px;margin-bottom:8px}
+.preview img{width:44px;height:44px;border-radius:8px;object-fit:cover}
+.preview .pdf-ico{width:44px;height:44px;border-radius:8px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;font-size:11px;font-weight:800;font-family:var(--mono)}
+.preview .info{flex:1;min-width:0;font-size:var(--fs-sm)}
+.preview .info b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.preview .info span{color:var(--text-3);font-size:var(--fs-xs)}
+.input-row{display:flex;align-items:flex-end;gap:4px}
+#txt{flex:1;resize:none;border:1px solid var(--line);background:var(--bg);border-radius:20px;padding:9px 14px;max-height:140px;min-height:40px;line-height:1.4;outline:none}
+#txt:focus{border-color:var(--brand)}
+#send{width:40px;height:40px;border-radius:50%;border:0;background:var(--brand);color:var(--on-brand);display:grid;place-items:center;flex:none}
+#send:disabled{opacity:.4;cursor:not-allowed}
+#send svg{width:18px;height:18px}
+
+/* ---------- Perfil / Historial ---------- */
+.sec-title{font-size:var(--fs-xs);font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);margin:24px 0 10px}
+.sec-title:first-child{margin-top:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md)}
+.kv{display:flex;justify-content:space-between;gap:16px;padding:12px 16px;border-top:1px solid var(--line);font-size:var(--fs-sm)}
+.kv:first-child{border-top:0}
+.kv dt{color:var(--text-2)}
+.kv dd{margin:0;text-align:right;font-weight:550;max-width:65%;overflow-wrap:anywhere}
+.badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:var(--fs-xs);font-weight:600;background:var(--ok-soft);color:var(--ok)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:12px 14px}
+.stat b{display:block;font-size:var(--fs-xl);font-family:var(--mono);font-weight:600;letter-spacing:-.5px}
+.stat span{font-size:var(--fs-xs);color:var(--text-3)}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+
+.timeline{list-style:none;margin:0;padding:0}
+.timeline li{display:flex;gap:12px;padding:14px 16px;border-top:1px solid var(--line)}
+.timeline li:first-child{border-top:0}
+.timeline .ico{flex:none;width:36px;height:36px;border-radius:8px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;font-family:var(--mono);font-size:10px;font-weight:800}
+.timeline .body{flex:1;min-width:0}
+.timeline .body b{display:block;font-size:var(--fs-sm);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.timeline .body span{font-size:var(--fs-xs);color:var(--text-3)}
+.timeline .body p{margin:6px 0 0;font-size:var(--fs-sm);color:var(--text-2)}
+.blank{padding:28px 16px;text-align:center;color:var(--text-2);font-size:var(--fs-sm)}
+.blank b{display:block;color:var(--text);margin-bottom:4px;font-size:var(--fs-md)}
+
+/* ---------- Modal ---------- */
+.overlay{position:fixed;inset:0;background:hsl(0 0% 0% / .4);display:grid;place-items:center;padding:16px;z-index:50}
+.modal{width:100%;max-width:440px;background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--shadow);max-height:90vh;overflow:auto}
+.modal header{display:flex;align-items:center;justify-content:space-between;padding:14px 12px 6px 20px}
+.modal header h3{margin:0;font-size:var(--fs-lg)}
+.modal .m-body{padding:8px 20px 4px}
+.modal footer{display:flex;justify-content:flex-end;gap:8px;padding:8px 20px 18px}
+details.adv{margin:4px 0 12px;font-size:var(--fs-sm)}
+details.adv summary{cursor:pointer;color:var(--text-2)}
+details.adv .field{margin-top:10px}
+
+/* ---------- Toast ---------- */
+#toast{position:fixed;left:50%;bottom:96px;transform:translate(-50%,20px);background:var(--text);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:var(--fs-sm);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:60;max-width:calc(100% - 32px);text-align:center}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+#toast.err{background:var(--danger);color:#fff}
+
+@media (max-width:520px){
+  .bubble{max-width:88%}
+  .stats{grid-template-columns:repeat(3,1fr)}
+  .stat b{font-size:var(--fs-lg)}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none !important;transition:none !important;scroll-behavior:auto !important}
+}
+</style>
+</head>
+<body>
+
+<!-- ================= SETUP ================= -->
+<section id="setup" class="hidden" aria-labelledby="setup-title">
+  <div class="guarda"></div>
+  <div class="setup-wrap">
+    <form class="setup-card" id="setup-form" novalidate>
+      <div class="setup-brand"><div class="logo">NS</div><b>NutriSalta</b></div>
+      <h1 id="setup-title">Comamos rico y cuidemos las articulaciones.</h1>
+      <p class="lead">Contame un poco de vos para que las recomendaciones sean tuyas.</p>
+      <div class="field">
+        <label for="s-name">¿Cómo te llamás?</label>
+        <input id="s-name" autocomplete="given-name" required maxlength="40" placeholder="Ej: Rosa">
+      </div>
+      <div class="field">
+        <label for="s-age">Edad</label>
+        <input id="s-age" type="number" inputmode="numeric" min="1" max="120" required placeholder="Ej: 64">
+      </div>
+      <div class="field">
+        <label for="s-goals">¿Qué querés lograr?</label>
+        <textarea id="s-goals" rows="3" maxlength="400" placeholder="Ej: bajar de peso, desinflamar las rodillas, comer más verdura"></textarea>
+        <div class="chips" id="goal-chips">
+          <button type="button" class="chip">Desinflamar articulaciones</button>
+          <button type="button" class="chip">Bajar de peso</button>
+          <button type="button" class="chip">Comer más sano</button>
+          <button type="button" class="chip">Cuidar el azúcar</button>
+          <button type="button" class="chip">Tener más energía</button>
+        </div>
+      </div>
+      <div class="field hidden" id="s-key-wrap">
+        <label for="s-key">Clave de Groq</label>
+        <input id="s-key" type="password" autocomplete="off" placeholder="gsk_…">
+        <span class="hint">Se guarda solo en este navegador.</span>
+      </div>
+      <button class="btn btn-primary" style="width:100%;margin-top:8px" type="submit">Empezar</button>
+    </form>
+  </div>
+</section>
+
+<!-- ================= APP ================= -->
+<div id="app" class="hidden">
+  <header class="topbar">
+    <div class="guarda"></div>
+    <div class="topbar-in">
+      <div class="logo">NS</div>
+      <div class="who">
+        <b>NutriSalta</b>
+        <span id="status"><i class="status-dot"></i>Listo para ayudarte</span>
+      </div>
+      <button class="icon-btn" id="btn-settings" aria-label="Editar mis datos" title="Editar mis datos">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </button>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab" role="tab" data-tab="chat" aria-selected="true">Chat</button>
+      <button class="tab" role="tab" data-tab="perfil" aria-selected="false">Perfil</button>
+      <button class="tab" role="tab" data-tab="historial" aria-selected="false">Historial</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Chat -->
+    <section class="panel" id="chat-panel" role="tabpanel">
+      <div id="msgs"><div class="panel-in" id="msg-list"></div></div>
+      <div class="composer">
+        <div class="composer-in">
+          <div class="preview hidden" id="preview">
+            <img id="pv-img" alt="" class="hidden">
+            <div class="pdf-ico hidden" id="pv-pdf">PDF</div>
+            <div class="info"><b id="pv-name"></b><span id="pv-meta"></span></div>
+            <button class="icon-btn" id="pv-remove" aria-label="Quitar adjunto" title="Quitar adjunto">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <div class="input-row">
+            <button class="icon-btn" id="btn-cam" aria-label="Sacar o subir foto de comida" title="Foto de comida">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            </button>
+            <button class="icon-btn" id="btn-pdf" aria-label="Subir análisis en PDF" title="Análisis de sangre (PDF)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 15h6M9 11h2"/></svg>
+            </button>
+            <input type="file" id="f-img" accept="image/*" capture="environment" class="hidden">
+            <input type="file" id="f-pdf" accept="application/pdf,.pdf" class="hidden">
+            <textarea id="txt" rows="1" placeholder="Preguntame lo que quieras sobre comida…" aria-label="Mensaje"></textarea>
+            <button id="send" aria-label="Enviar" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Perfil -->
+    <section class="panel hidden" id="perfil-panel" role="tabpanel">
+      <div class="panel-in" id="perfil-body"></div>
+    </section>
+
+    <!-- Historial -->
+    <section class="panel hidden" id="historial-panel" role="tabpanel">
+      <div class="panel-in" id="historial-body"></div>
+    </section>
+  </main>
+</div>
+
+<!-- ================= MODAL CONFIG ================= -->
+<div class="overlay hidden" id="modal" role="dialog" aria-modal="true" aria-labelledby="m-title">
+  <form class="modal" id="m-form" novalidate>
+    <header>
+      <h3 id="m-title">Mis datos</h3>
+      <button type="button" class="icon-btn" id="m-close" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </header>
+    <div class="m-body">
+      <div class="field"><label for="m-name">Nombre</label><input id="m-name" maxlength="40" required></div>
+      <div class="field"><label for="m-age">Edad</label><input id="m-age" type="number" min="1" max="120" required></div>
+      <div class="field"><label for="m-goals">Objetivos</label><textarea id="m-goals" rows="3" maxlength="400"></textarea></div>
+      <details class="adv">
+        <summary>Conexión avanzada</summary>
+        <div class="field">
+          <label for="m-key">Clave de Groq propia (opcional)</label>
+          <input id="m-key" type="password" autocomplete="off" placeholder="gsk_…">
+          <span class="hint">Reemplaza la clave actual. Se guarda solo en este navegador.</span>
+        </div>
+      </details>
+    </div>
+    <footer>
+      <button type="button" class="btn btn-ghost" id="m-cancel">Cancelar</button>
+      <button type="submit" class="btn btn-primary">Guardar cambios</button>
+    </footer>
+  </form>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+
+/* ===================== CONFIG GROQ ===================== */
+const GROQ_URL     = 'https://api.groq.com/openai/v1/chat/completions';
+// La clave NO se sube al repo (GitHub la bloquea). Pegala acá en tu copia local,
+// o cargala una vez en la pantalla inicial / Mis datos → Conexión avanzada.
+const KEY          = '';
+const MODEL        = 'llama-3.3-70b-versatile';
+// Modelo con visión de Groq, para que la foto se analice de verdad.
+// Si falla, se cae al MODEL de texto con la descripción "[El usuario envió una foto...]".
+const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
+const STORE_KEY    = 'ns_v4';
+const MAX_SAVED    = 60;   // msgs guardados
+const CTX_MSGS     = 14;   // msgs enviados como contexto
+const MAX_PDF_CHARS= 9000; // recorte del texto del PDF para no pasarnos de tokens
+
+if(window.pdfjsLib){
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}else{
+  console.error('[NutriSalta] PDF.js no cargó desde cdnjs. La lectura de PDFs no va a funcionar.');
+}
+
+/* ===================== ESTADO ===================== */
+let S = {
+  name:'', age:'', goals:'', conditions:'artrosis',
+  msgs:[], nMsgs:0, nImgs:0, nPdfs:0, since:null, clinHist:[]
+};
+let pending = null;   // adjunto en preview: {type:'img'|'pdf', name, dataUrl?, text?, pages?, size}
+let busy = false;
+
+function load(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(raw){ S = Object.assign(S, JSON.parse(raw)); }
+  }catch(e){ console.warn('[NutriSalta] No se pudo leer localStorage', e); }
+  S.conditions = 'artrosis'; // hardcodeada siempre
+}
+function save(){
+  S.msgs = S.msgs.slice(-MAX_SAVED);
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(S)); }
+  catch(e){
+    console.warn('[NutriSalta] localStorage lleno, recorto historial', e);
+    try{ S.msgs = S.msgs.slice(-20); localStorage.setItem(STORE_KEY, JSON.stringify(S)); }catch(_){}
+  }
+}
+function apiKey(){
+  try{ return (localStorage.getItem(STORE_KEY+'_key') || '').trim() || KEY; }catch(_){ return KEY; }
+}
+
+/* ===================== SYSTEM PROMPT ===================== */
+function systemPrompt(){
+  const hist = S.clinHist.length
+    ? S.clinHist.map(h => `- ${h.name} (${fmtDate(h.date)})`).join('\n')
+    : '- Sin análisis cargados todavía.';
+  return `Sos NutriSalta, un asistente de nutrición y alimentación para ${S.name}, ${S.age} años, con artrosis.
+Objetivos de ${S.name}: ${S.goals || 'comer más sano y sentirse mejor'}.
+
+Historial clínico (solo análisis subidos en PDF):
+${hist}
+
+ESTILO
+- Hablás de vos, como una persona de Salta (argentino salteño): cálido, cercano, simple. Usá expresiones locales con moderación.
+- Respuestas claras y breves. Usá listas cortas cuando ayuden. Nada de tecnicismos innecesarios.
+- Conocés a fondo la gastronomía del NOA: tamales, humita, locro, empanadas salteñas, mondongo, charqui, mote, api, arrope, quesillo, cabrito, llama, maíz morado, papa andina, quínoa, locoto. Proponé versiones más sanas de estos platos y adaptalas a la artrosis (antiinflamatorias, buen aporte de calcio, omega-3, vitamina D, control de peso).
+
+TEMAS PERMITIDOS
+- Solo hablás de: alimentación, nutrición, recetas, hidratación, ejercicio de bajo impacto (caminar, agua, estiramientos suaves) y bienestar.
+- Si te preguntan otra cosa, redirigí con amabilidad hacia la comida o el bienestar.
+- Podés mencionar: glucosa, colesterol, triglicéridos, hemoglobina, insulina, presión arterial, ácido úrico, tiroides, diabetes, hipertensión, anemia, osteoporosis.
+
+LÍMITES ESTRICTOS
+- NUNCA menciones: cáncer, tumor, maligno, leucemia, linfoma, metástasis ni ninguna enfermedad terminal. Si un análisis contiene marcadores o términos de ese tipo, ignoralos por completo y no los nombres.
+- NUNCA generes miedo ni angustia. Si un valor está fuera de rango, decilo con calma, explicá qué alimentos ayudan y sugerí comentarlo con su médico en el próximo control, sin dramatizar.
+- No diagnosticás ni recetás medicamentos.
+
+ANÁLISIS DE SANGRE (PDF)
+- Leé los valores, explicá en lenguaje simple los que tienen que ver con la alimentación, y dá recomendaciones de comida concretas.
+
+FOTOS DE COMIDA
+- Identificá el plato, estimá porciones, calorías aproximadas y macronutrientes, y decí qué tan bien le viene para la artrosis y sus objetivos. Sugerí un ajuste fácil.
+
+CIERRE
+- Terminá SIEMPRE con un consejo nutricional concreto y motivador (una línea, empezando con "👉").`;
+}
+
+/* ===================== LLAMADA A GROQ ===================== */
+async function callGroq(messages, model){
+  const body = { model, messages, temperature: 0.6, max_tokens: 1024 };
+  let res;
+  // 1) Error de red (sin respuesta: DNS, CORS, offline...)
+  try{
+    res = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + apiKey(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+  }catch(netErr){
+    console.error('[NutriSalta] Error de RED al llamar a Groq:', netErr);
+    const e = new Error('No pude conectarme. Revisá tu conexión a internet y probá de nuevo.');
+    e.kind = 'network';
+    throw e;
+  }
+  // 2) Error de respuesta (HTTP no-OK)
+  if(!res.ok){
+    let errText = '';
+    try{ errText = await res.text(); }catch(_){}
+    console.error('[NutriSalta] Groq respondió HTTP ' + res.status + ' ' + res.statusText + ':', errText);
+    let detail = '';
+    try{ detail = JSON.parse(errText).error.message || ''; }catch(_){ detail = errText.slice(0,200); }
+    const e = new Error(httpMessage(res.status, detail));
+    e.kind = 'http'; e.status = res.status; e.detail = detail;
+    throw e;
+  }
+  // 3) Respuesta OK pero JSON raro
+  let data;
+  try{ data = await res.json(); }
+  catch(parseErr){
+    console.error('[NutriSalta] No se pudo parsear la respuesta de Groq:', parseErr);
+    const e = new Error('La respuesta llegó incompleta. Probá de nuevo.'); e.kind='parse'; throw e;
+  }
+  const out = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+  if(!out){
+    console.error('[NutriSalta] Respuesta sin contenido:', data);
+    const e = new Error('No recibí respuesta del asistente. Probá de nuevo.'); e.kind='empty'; throw e;
+  }
+  return out.trim();
+}
+function httpMessage(status, detail){
+  if(status === 401) return 'La clave de Groq no es válida o fue revocada (401). Cargá una nueva en Mis datos → Conexión avanzada.';
+  if(status === 429) return 'Demasiadas consultas seguidas (429). Esperá un minuto y volvé a intentar.';
+  if(status === 413) return 'El mensaje es demasiado largo (413). Probá con un PDF más corto.';
+  if(status >= 500)  return 'Groq está con problemas (' + status + '). Probá en un rato.';
+  return 'Error ' + status + (detail ? ': ' + detail : '');
+}
+
+/* ===================== ENVIAR MENSAJE ===================== */
+async function send(){
+  if(busy) return;
+  const txtEl = $('#txt');
+  const text = txtEl.value.trim();
+  const att = pending;
+  if(!text && !att) return;
+
+  // Construyo contenido para el modelo y para mostrar
+  let apiContent = text;
+  let shown = text;
+  let attMeta = null;
+
+  if(att && att.type === 'pdf'){
+    apiContent =
+`[El usuario subió un análisis de sangre en PDF: "${att.name}" (${att.pages} pág.). Texto extraído:]
+"""
+${att.text}
+"""
+${text ? '\nPregunta del usuario: ' + text : '\nExplicame estos resultados en relación a mi alimentación y la artrosis.'}`;
+    shown = text || 'Te paso mi análisis de sangre.';
+    attMeta = {type:'pdf', name:att.name};
+    S.nPdfs++;
+    S.clinHist.push({ name: att.name, date: new Date().toISOString(), pages: att.pages });
+  }
+  if(att && att.type === 'img'){
+    apiContent = '[El usuario envió una foto de comida. Analizala nutricionalmente.]' + (text ? '\n' + text : '');
+    shown = text || 'Mirá lo que voy a comer.';
+    attMeta = {type:'img', name:att.name};
+    S.nImgs++;
+  }
+
+  const userMsg = { role:'user', content:apiContent, shown, att:attMeta, ts:Date.now() };
+  S.msgs.push(userMsg);
+  S.nMsgs++;
+  save();
+
+  txtEl.value = ''; autosize(); clearPending();
+  renderMsg(userMsg, att && att.type === 'img' ? att.dataUrl : null);
+  setBusy(true);
+  const typingRow = showTyping();
+
+  // Contexto: system + últimos N mensajes
+  const ctx = S.msgs.slice(-CTX_MSGS).map(m => ({ role:m.role, content:m.content }));
+  const messages = [{ role:'system', content:systemPrompt() }, ...ctx];
+
+  try{
+    let reply;
+    if(att && att.type === 'img'){
+      reply = await sendWithImage(messages, att.dataUrl);
+    }else{
+      reply = await callGroq(messages, MODEL);
+    }
+    typingRow.remove();
+    const botMsg = { role:'assistant', content:reply, ts:Date.now() };
+    S.msgs.push(botMsg); save();
+    renderMsg(botMsg);
+    setStatus(true);
+  }catch(err){
+    typingRow.remove();
+    renderError(err.message);
+    toast(err.message, true);
+    setStatus(false);
+  }finally{
+    setBusy(false);
+    refreshPanels();
+  }
+}
+
+// Intenta con modelo de visión enviando la imagen real; si falla, cae al modelo de texto.
+async function sendWithImage(messages, dataUrl){
+  const vis = messages.slice();
+  const last = vis[vis.length-1];
+  vis[vis.length-1] = {
+    role:'user',
+    content:[
+      { type:'text', text:last.content },
+      { type:'image_url', image_url:{ url:dataUrl } }
+    ]
+  };
+  // Los modelos de visión no aceptan system + imagen en todos los casos: paso el system como primer texto
+  const sys = vis.shift();
+  vis[vis.length-1].content[0].text = sys.content + '\n\n---\n' + vis[vis.length-1].content[0].text;
+  try{
+    return await callGroq(vis.slice(-6), VISION_MODEL);
+  }catch(err){
+    console.warn('[NutriSalta] Visión no disponible, uso modelo de texto:', err.message);
+    if(err.kind === 'network') throw err;
+    const fallback = messages.slice();
+    fallback[fallback.length-1] = { role:'user', content: last.content +
+      '\n(No pudiste ver la imagen. Pedile amablemente que te cuente qué plato es y la porción, y mientras tanto dale pautas generales para armar un plato saludable para la artrosis.)' };
+    return await callGroq(fallback, MODEL);
+  }
+}
+
+/* ===================== ADJUNTOS ===================== */
+async function onImage(file){
+  if(!file) return;
+  if(!file.type.startsWith('image/')){ toast('Elegí un archivo de imagen.', true); return; }
+  try{
+    const dataUrl = await readAsDataURL(file);       // FileReader → base64
+    const small = await shrinkImage(dataUrl, 1024);  // reduce peso para la API
+    pending = { type:'img', name:file.name || 'foto.jpg', dataUrl:small, size:file.size };
+    showPending();
+  }catch(e){
+    console.error('[NutriSalta] Error leyendo imagen', e);
+    toast('No pude leer la foto. Probá con otra.', true);
+  }
+}
+async function onPdf(file){
+  if(!file) return;
+  if(file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)){ toast('Elegí un archivo PDF.', true); return; }
+  if(!window.pdfjsLib){ toast('No se pudo cargar el lector de PDF. Revisá tu conexión y recargá la página.', true); return; }
+  toast('Leyendo el PDF…');
+  try{
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    let text = '';
+    for(let i=1; i<=pdf.numPages; i++){
+      const page = await pdf.getPage(i);
+      const tc = await page.getTextContent();
+      // Reconstruyo líneas respetando saltos (hasEOL) para que los valores queden juntos
+      let line = '';
+      for(const it of tc.items){
+        line += it.str + (it.hasEOL ? '\n' : ' ');
+      }
+      text += `\n--- Página ${i} ---\n` + line;
+    }
+    text = text.replace(/[ \t]+/g,' ').replace(/\n\s*\n+/g,'\n').trim();
+    if(text.replace(/--- Página \d+ ---/g,'').trim().length < 20){
+      toast('Este PDF parece escaneado (imagen) y no tiene texto para leer.', true);
+      return;
+    }
+    if(text.length > MAX_PDF_CHARS) text = text.slice(0, MAX_PDF_CHARS) + '\n[…texto recortado…]';
+    pending = { type:'pdf', name:file.name, text, pages:pdf.numPages, size:file.size };
+    showPending();
+    toast('PDF listo. Agregá una pregunta o enviá directo.');
+  }catch(e){
+    console.error('[NutriSalta] Error leyendo PDF', e);
+    toast('No pude leer el PDF. ¿Está protegido con contraseña?', true);
+  }
+}
+function readAsDataURL(file){
+  return new Promise((ok, fail) => {
+    const r = new FileReader();
+    r.onload = () => ok(r.result);
+    r.onerror = () => fail(r.error);
+    r.readAsDataURL(file);
+  });
+}
+function shrinkImage(dataUrl, max){
+  return new Promise(ok => {
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width*k); c.height = Math.round(img.height*k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      try{ ok(c.toDataURL('image/jpeg', 0.82)); }catch(_){ ok(dataUrl); }
+    };
+    img.onerror = () => ok(dataUrl);
+    img.src = dataUrl;
+  });
+}
+function showPending(){
+  const p = pending;
+  $('#preview').classList.remove('hidden');
+  $('#pv-name').textContent = p.name;
+  if(p.type === 'img'){
+    $('#pv-img').src = p.dataUrl; $('#pv-img').classList.remove('hidden'); $('#pv-pdf').classList.add('hidden');
+    $('#pv-meta').textContent = 'Foto de comida · ' + kb(p.size);
+  }else{
+    $('#pv-img').classList.add('hidden'); $('#pv-pdf').classList.remove('hidden');
+    $('#pv-meta').textContent = 'Análisis · ' + p.pages + (p.pages === 1 ? ' página' : ' páginas') + ' · ' + kb(p.size);
+  }
+  updateSend();
+  $('#txt').focus();
+}
+function clearPending(){
+  pending = null;
+  $('#preview').classList.add('hidden');
+  $('#pv-img').removeAttribute('src');
+  $('#f-img').value = ''; $('#f-pdf').value = '';
+  updateSend();
+}
+
+/* ===================== RENDER CHAT ===================== */
+const ICON_IMG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>';
+const ICON_PDF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>';
+
+function renderAll(){
+  const list = $('#msg-list');
+  list.innerHTML = '';
+  if(!S.msgs.length){ list.appendChild(emptyState()); return; }
+  S.msgs.forEach(m => renderMsg(m, null, true));
+  scrollDown(true);
+}
+function renderMsg(m, imgUrl, noScroll){
+  const list = $('#msg-list');
+  const empty = list.querySelector('.empty'); if(empty) empty.remove();
+  const row = document.createElement('div');
+  row.className = 'row ' + (m.role === 'user' ? 'user' : 'bot');
+  let inner = '';
+  if(m.role === 'user'){
+    if(imgUrl) inner += `<img class="thumb" src="${imgUrl}" alt="Foto enviada">`;
+    else if(m.att) inner += `<span class="att-tag">${m.att.type==='pdf'?ICON_PDF:ICON_IMG}${esc(m.att.name)}</span><br>`;
+    inner += esc(m.shown != null ? m.shown : m.content).replace(/\n/g,'<br>');
+  }else{
+    inner = md(m.content);
+  }
+  inner += `<span class="meta">${fmtTime(m.ts)}</span>`;
+  row.innerHTML = (m.role === 'user' ? '' : '<div class="avatar" aria-hidden="true">NS</div>') + `<div class="bubble">${inner}</div>`;
+  list.appendChild(row);
+  if(!noScroll) scrollDown();
+}
+function renderError(text){
+  const row = document.createElement('div');
+  row.className = 'row error';
+  row.innerHTML = `<div class="avatar" aria-hidden="true">!</div><div class="bubble">${esc(text)}</div>`;
+  $('#msg-list').appendChild(row); scrollDown();
+}
+function showTyping(){
+  const row = document.createElement('div');
+  row.className = 'row bot';
+  row.innerHTML = '<div class="avatar" aria-hidden="true">NS</div><div class="bubble" aria-label="NutriSalta está escribiendo"><span class="typing"><i></i><i></i><i></i></span></div>';
+  $('#msg-list').appendChild(row); scrollDown();
+  return row;
+}
+function emptyState(){
+  const d = document.createElement('div');
+  d.className = 'empty';
+  const starters = [
+    ['Receta', 'Un locro más liviano y antiinflamatorio'],
+    ['Desayuno', '¿Qué desayuno me conviene para las rodillas?'],
+    ['Antojo', '¿Puedo comer empanadas salteñas? ¿Cuántas?'],
+    ['Movimiento', 'Ejercicios suaves para hacer en casa']
+  ];
+  d.innerHTML = `<h2>Hola, ${esc(S.name)}</h2>
+    <p>Preguntame sobre comidas, recetas del norte, o mandame una foto del plato o tu último análisis.</p>
+    <div class="starters">${starters.map(s=>`<button class="starter" data-q="${esc(s[1])}"><small>${s[0]}</small>${esc(s[1])}</button>`).join('')}</div>`;
+  d.querySelectorAll('.starter').forEach(b => b.onclick = () => { $('#txt').value = b.dataset.q; updateSend(); send(); });
+  return d;
+}
+function scrollDown(instant){
+  const box = $('#msgs');
+  requestAnimationFrame(() => box.scrollTo({ top: box.scrollHeight, behavior: instant ? 'auto' : 'smooth' }));
+}
+
+/* Markdown mínimo y seguro (escapa primero) */
+function md(src){
+  const lines = esc(src).split('\n');
+  let html = '', list = null;
+  const inline = s => s
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/(^|[^*])\*(?!\s)(.+?)\*(?!\*)/g,'$1<em>$2</em>')
+    .replace(/`([^`]+)`/g,'<code>$1</code>');
+  const close = () => { if(list){ html += `</${list}>`; list = null; } };
+  for(const raw of lines){
+    const l = raw.trim();
+    let m;
+    if(!l){ close(); continue; }
+    if((m = l.match(/^#{1,6}\s+(.*)/))){ close(); html += `<h4>${inline(m[1])}</h4>`; continue; }
+    if((m = l.match(/^[-*•]\s+(.*)/))){ if(list!=='ul'){ close(); html+='<ul>'; list='ul'; } html += `<li>${inline(m[1])}</li>`; continue; }
+    if((m = l.match(/^\d+[.)]\s+(.*)/))){ if(list!=='ol'){ close(); html+='<ol>'; list='ol'; } html += `<li>${inline(m[1])}</li>`; continue; }
+    close(); html += `<p>${inline(l)}</p>`;
+  }
+  close();
+  return html;
+}
+
+/* ===================== PERFIL / HISTORIAL ===================== */
+function renderPerfil(){
+  const days = S.since ? Math.max(1, Math.ceil((Date.now() - new Date(S.since)) / 864e5)) : 1;
+  $('#perfil-body').innerHTML = `
+    <h2 class="sec-title">Tus datos</h2>
+    <dl class="card" style="margin:0">
+      <div class="kv"><dt>Nombre</dt><dd>${esc(S.name)}</dd></div>
+      <div class="kv"><dt>Edad</dt><dd>${esc(String(S.age))} años</dd></div>
+      <div class="kv"><dt>Objetivos</dt><dd>${esc(S.goals) || '<span style="color:var(--text-3)">Sin definir</span>'}</dd></div>
+      <div class="kv"><dt>Condición</dt><dd><span class="badge">Artrosis</span></dd></div>
+      <div class="kv"><dt>Usás NutriSalta desde</dt><dd>${S.since ? fmtDate(S.since) : '—'} · ${days} ${days===1?'día':'días'}</dd></div>
+    </dl>
+    <h2 class="sec-title">Actividad</h2>
+    <div class="stats">
+      <div class="stat"><b>${S.nMsgs}</b><span>Consultas</span></div>
+      <div class="stat"><b>${S.nImgs}</b><span>Fotos de platos</span></div>
+      <div class="stat"><b>${S.nPdfs}</b><span>Análisis</span></div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-ghost" id="p-edit">Editar mis datos</button>
+      <button class="btn btn-ghost" id="p-clear">Borrar conversación</button>
+      <button class="btn btn-danger" id="p-reset">Empezar de cero</button>
+    </div>`;
+  $('#p-edit').onclick = openModal;
+  $('#p-clear').onclick = () => {
+    if(!confirm('¿Borrar la conversación? Tus datos y el historial de análisis se mantienen.')) return;
+    S.msgs = []; save(); renderAll(); toast('Conversación borrada.');
+  };
+  $('#p-reset').onclick = () => {
+    if(!confirm('Esto borra todos tus datos, la conversación y el historial. ¿Seguimos?')) return;
+    try{ localStorage.removeItem(STORE_KEY); }catch(_){}
+    location.reload();
+  };
+}
+function renderHistorial(){
+  const items = S.clinHist.slice().reverse();
+  const list = items.length
+    ? `<ul class="timeline">${items.map(h=>`
+        <li><div class="ico">PDF</div>
+          <div class="body"><b>${esc(h.name)}</b>
+          <span>${fmtDate(h.date)} · ${fmtTime(new Date(h.date).getTime())}${h.pages?` · ${h.pages} ${h.pages===1?'página':'páginas'}`:''}</span></div>
+        </li>`).join('')}</ul>`
+    : `<div class="blank"><b>Todavía no subiste análisis</b>Tocá el ícono de documento en el chat y elegí el PDF de tu último análisis de sangre. Lo leo y te explico qué comer según los resultados.</div>`;
+  const photos = S.msgs.filter(m => m.att && m.att.type === 'img').slice(-10).reverse();
+  const photoList = photos.length
+    ? `<ul class="timeline">${photos.map(m=>`
+        <li><div class="ico" style="background:var(--ok-soft);color:var(--ok)">IMG</div>
+          <div class="body"><b>${esc(m.shown || 'Foto de comida')}</b><span>${fmtDate(new Date(m.ts).toISOString())} · ${fmtTime(m.ts)}</span></div>
+        </li>`).join('')}</ul>`
+    : `<div class="blank"><b>Sin fotos de platos</b>Sacale una foto a lo que vas a comer y te digo cómo viene para tus articulaciones.</div>`;
+  $('#historial-body').innerHTML = `
+    <h2 class="sec-title">Historial clínico · ${S.clinHist.length} ${S.clinHist.length===1?'análisis':'análisis'}</h2>
+    <div class="card">${list}</div>
+    <p class="hint" style="margin:8px 2px 0">Se arma solo con los PDFs que subís. NutriSalta los tiene en cuenta en cada respuesta.</p>
+    <h2 class="sec-title">Platos analizados</h2>
+    <div class="card">${photoList}</div>`;
+}
+function refreshPanels(){ renderPerfil(); renderHistorial(); }
+
+/* ===================== MODAL ===================== */
+function openModal(){
+  $('#m-name').value = S.name; $('#m-age').value = S.age; $('#m-goals').value = S.goals;
+  try{ $('#m-key').value = localStorage.getItem(STORE_KEY+'_key') || ''; }catch(_){}
+  $('#modal').classList.remove('hidden');
+  setTimeout(() => $('#m-name').focus(), 30);
+}
+function closeModal(){ $('#modal').classList.add('hidden'); }
+
+/* ===================== UI HELPERS ===================== */
+const $ = s => document.querySelector(s);
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function kb(n){ return n > 1048576 ? (n/1048576).toFixed(1)+' MB' : Math.max(1,Math.round(n/1024))+' KB'; }
+function fmtDate(iso){ try{ return new Date(iso).toLocaleDateString('es-AR',{day:'numeric',month:'short',year:'numeric'}); }catch(_){ return ''; } }
+function fmtTime(ts){ try{ return new Date(ts).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}); }catch(_){ return ''; } }
+let toastT;
+function toast(msg, isErr){
+  const t = $('#toast');
+  t.textContent = msg; t.classList.toggle('err', !!isErr); t.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), isErr ? 4500 : 2600);
+}
+function setBusy(b){
+  busy = b; updateSend();
+  $('#status').innerHTML = b ? '<i class="status-dot"></i>Escribiendo…' : $('#status').innerHTML;
+}
+function setStatus(ok){
+  $('#status').innerHTML = ok ? '<i class="status-dot"></i>Listo para ayudarte' : '<i class="status-dot err"></i>Sin conexión con el asistente';
+}
+function updateSend(){ $('#send').disabled = busy || (!$('#txt').value.trim() && !pending); }
+function autosize(){ const t = $('#txt'); t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 140) + 'px'; }
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.tab === name));
+  ['chat','perfil','historial'].forEach(n => $('#'+n+'-panel').classList.toggle('hidden', n !== name));
+  if(name === 'chat') scrollDown(true);
+}
+
+/* ===================== ARRANQUE ===================== */
+function showApp(){
+  $('#setup').classList.add('hidden');
+  $('#app').classList.remove('hidden');
+  renderAll(); refreshPanels();
+}
+function init(){
+  load();
+
+  // Setup
+  document.querySelectorAll('#goal-chips .chip').forEach(c => c.onclick = () => {
+    const g = $('#s-goals'); const v = c.textContent.toLowerCase();
+    c.classList.toggle('on');
+    const parts = g.value.split(',').map(s=>s.trim()).filter(Boolean);
+    const i = parts.findIndex(p => p.toLowerCase() === v);
+    if(i >= 0) parts.splice(i,1); else parts.push(v);
+    g.value = parts.join(', ');
+  });
+  $('#setup-form').onsubmit = e => {
+    e.preventDefault();
+    const name = $('#s-name').value.trim(), age = $('#s-age').value.trim();
+    if(!name){ toast('Escribí tu nombre para empezar.', true); $('#s-name').focus(); return; }
+    if(!age || +age < 1 || +age > 120){ toast('Revisá la edad.', true); $('#s-age').focus(); return; }
+    if(!apiKey()){
+      const k = $('#s-key').value.trim();
+      if(!k){ toast('Pegá tu clave de Groq para poder conversar.', true); $('#s-key').focus(); return; }
+      try{ localStorage.setItem(STORE_KEY+'_key', k); }catch(_){}
+    }
+    S.name = name; S.age = age; S.goals = $('#s-goals').value.trim();
+    S.since = S.since || new Date().toISOString();
+    save(); showApp();
+  };
+
+  // Tabs
+  document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab));
+
+  // Composer
+  const txt = $('#txt');
+  txt.addEventListener('input', () => { autosize(); updateSend(); });
+  txt.addEventListener('keydown', e => {
+    if(e.key === 'Enter' && !e.shiftKey && !e.isComposing && window.matchMedia('(hover:hover)').matches){ e.preventDefault(); send(); }
+  });
+  $('#send').onclick = send;
+  $('#btn-cam').onclick = () => $('#f-img').click();
+  $('#btn-pdf').onclick = () => $('#f-pdf').click();
+  $('#f-img').onchange = e => onImage(e.target.files[0]);
+  $('#f-pdf').onchange = e => onPdf(e.target.files[0]);
+  $('#pv-remove').onclick = clearPending;
+
+  // Modal
+  $('#btn-settings').onclick = openModal;
+  $('#m-close').onclick = closeModal;
+  $('#m-cancel').onclick = closeModal;
+  $('#modal').addEventListener('click', e => { if(e.target.id === 'modal') closeModal(); });
+  document.addEventListener('keydown', e => { if(e.key === 'Escape' && !$('#modal').classList.contains('hidden')) closeModal(); });
+  $('#m-form').onsubmit = e => {
+    e.preventDefault();
+    const name = $('#m-name').value.trim(), age = $('#m-age').value.trim();
+    if(!name){ toast('El nombre no puede quedar vacío.', true); return; }
+    if(!age || +age < 1 || +age > 120){ toast('Revisá la edad.', true); return; }
+    S.name = name; S.age = age; S.goals = $('#m-goals').value.trim();
+    try{
+      const k = $('#m-key').value.trim();
+      if(k) localStorage.setItem(STORE_KEY+'_key', k); else localStorage.removeItem(STORE_KEY+'_key');
+    }catch(_){}
+    save(); closeModal(); refreshPanels();
+    if(!S.msgs.length) renderAll();
+    toast('Datos guardados.');
+  };
+
+  if(!apiKey()) $('#s-key-wrap').classList.remove('hidden');
+  if(S.name){ showApp(); } else { $('#setup').classList.remove('hidden'); $('#s-name').focus(); }
+}
+init();
+</script>
+</body>
+</html>
