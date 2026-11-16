@@ -656,12 +656,14 @@ const MODEL        = 'llama-3.3-70b-versatile'; // preferido; si Groq lo da de b
 // Si falla, se cae al MODEL de texto con la descripción "[El usuario envió una foto...]".
 const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
 const STORE_KEY    = 'ns_v4';
-const APP_VERSION  = '2.4 · 16 nov 2026'; // subir en cada cambio para verificar que el celular se actualizó
+const APP_VERSION  = '2.5 · 16 nov 2026'; // subir en cada cambio para verificar que el celular se actualizó
 const FORMAT_REMINDER = '(Respondé de vos, como en Salta (probá, sumá, acompañá; nunca "añade" ni "prueba"), en máximo 4 líneas, una sola idea, sin listas ni tablas. Terminá con un 👉 de una sola acción.)';
 const MAX_REPLY_CHARS = 420;
 const MAX_SAVED    = 200;  // msgs guardados de la charla de HOY (los días anteriores se archivan)
 const CTX_MSGS     = 14;   // msgs enviados como contexto
-const MAX_PDF_CHARS= 9000; // recorte del texto del PDF para no pasarnos de tokens
+const MAX_PDF_CHARS= 40000; // texto máximo que se lee del PDF (se analiza por partes)
+const PDF_CHUNK    = 7000;  // tamaño de cada parte que se manda a la IA
+const PDF_CHAT_CHARS = 9000; // lo que se manda al chat si no se pudo estructurar
 
 if(window.pdfjsLib){
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -1174,8 +1176,53 @@ function undoLogged(m){
 }
 
 /* ===================== ANÁLISIS DE ESTUDIOS (PDF) ===================== */
+// Divide el texto en partes (respetando páginas) para leer el PDF completo sin pasarse de tokens
+function splitPdfChunks(text){
+  const pages = text.split(/(?=--- Página \d+ ---)/), out = []; let cur = '';
+  for(const pg of pages){
+    if(cur && (cur + pg).length > PDF_CHUNK){ out.push(cur); cur = ''; }
+    if(pg.length > PDF_CHUNK){ for(let i = 0; i < pg.length; i += PDF_CHUNK) out.push(pg.slice(i, i + PDF_CHUNK)); }
+    else cur += pg;
+  }
+  if(cur.trim()) out.push(cur);
+  return out.slice(0, 6);
+}
 async function analyzeStudy(text, fileName){
-  const prompt = `Analizá el texto extraído de un PDF llamado "${fileName}". Determiná si es un estudio médico (análisis de laboratorio, perfil lipídico, hemograma, densitometría, informe de control, etc.) y extraé los datos.
+  const chunks = splitPdfChunks(text);
+  const parts = []; let lastErr = null;
+  for(let i = 0; i < chunks.length; i++){
+    if(chunks.length > 1) setStatusText(`Leyendo el estudio (parte ${i + 1} de ${chunks.length})…`);
+    try{ parts.push(await analyzeStudyPart(chunks[i], fileName, i, chunks.length)); }
+    catch(e){ lastErr = e; if(e.kind === 'network' && !parts.length && i === 0) throw e; console.warn('[NutriSalta] Parte ' + (i + 1) + ' del estudio falló:', e.message); }
+  }
+  if(!parts.length) throw lastErr || Object.assign(new Error('No pude interpretar el estudio.'), { kind:'parse' });
+  // Unir: datos generales de la primera parte que los tenga; valores sin repetir
+  const pick = k => (parts.find(x => x[k]) || {})[k];
+  const seen = new Set(), values = [];
+  parts.forEach(x => x.values.forEach(v => { const k = v.nombre.toLowerCase().replace(/\s+/g, ' '); if(!seen.has(k)){ seen.add(k); values.push(v); } }));
+  addDerivedValues(values);
+  return {
+    isStudy: parts.some(x => x.isStudy) && values.length > 0,
+    kind: pick('kind') || 'Estudio', studyDate: pick('studyDate') || null, lab: pick('lab') || '',
+    values: values.slice(0, 80),
+    summary: (parts.find(x => x.summary) || {}).summary || '',
+    weight: pick('weight'), height: pick('height')
+  };
+}
+// Índices que se pueden calcular si el laboratorio no los informó
+function addDerivedValues(values){
+  const find = re => values.find(v => re.test(v.nombre));
+  const num = v => parseFloat(String(v.valor).replace(',', '.'));
+  if(!find(/homa/i)){
+    const g = find(/^gluc(emia|osa)/i), ins = find(/insulin/i);
+    if(g && ins && isFinite(num(g)) && isFinite(num(ins)) && num(ins) > 0 && !/mmol/i.test(g.unidad)){
+      const h = num(g) * num(ins) / 405;
+      values.push({ nombre:'HOMA-IR (calculado)', valor: h.toFixed(1), unidad:'', referencia:'menor a 2,5', estado: h < 2.5 ? 'normal' : 'alto' });
+    }
+  }
+}
+async function analyzeStudyPart(text, fileName, idx, total){
+  const prompt = `Analizá el texto extraído de un PDF llamado "${fileName}"${total > 1 ? ` (parte ${idx + 1} de ${total}; extraé solo los valores que aparecen en esta parte)` : ''}. Determiná si es un estudio médico (análisis de laboratorio, perfil lipídico, hemograma, densitometría, informe de control, etc.) y extraé los datos.
 Respondé SOLO con un objeto JSON con esta forma exacta:
 {
   "es_estudio": true,
@@ -1188,12 +1235,13 @@ Respondé SOLO con un objeto JSON con esta forma exacta:
   "resumen": "1 o 2 frases simples sobre lo que importa para la alimentación"
 }
 Reglas:
-- Incluí todos los valores numéricos del estudio con su unidad y rango de referencia si figura.
+- Incluí TODOS los valores numéricos del estudio con su unidad y rango de referencia si figura, sin saltear ninguno.
+- Incluí también índices y cálculos que figuren: HOMA (HOMA-IR), insulina, índice de Castelli/aterogénico, filtrado glomerular, colesterol no-HDL, etc.
 - "estado" compará el valor con la referencia.
 - Usá nombres en español y cortos (ej: "Colesterol LDL", "Hemoglobina", "TSH", "Vitamina D").
 - NO incluyas marcadores tumorales ni nada relacionado con cáncer, tumores u oncología: omitilos por completo.
 - El resumen no debe alarmar.
-- Si no es un estudio médico, devolvé "es_estudio": false y "valores": [].
+- Si no es un estudio médico, devolvé "es_estudio": false y "valores": [].${total > 1 ? '\n- Si esta parte no tiene fecha, laboratorio o tipo, poné null en esos campos.' : ''}
 
 TEXTO:
 """
@@ -1485,7 +1533,7 @@ async function send(){
 function rawPdfMessage(att, text){
   return `[El usuario subió un PDF: "${att.name}" (${att.pages} pág.). Texto extraído:]
 """
-${att.text}
+${att.text.length > PDF_CHAT_CHARS ? att.text.slice(0, PDF_CHAT_CHARS) + '\n[…]' : att.text}
 """
 ${text ? '\nPregunta del usuario: ' + text : '\nExplicame estos resultados en relación a mi alimentación y la artrosis.'}`;
 }
@@ -1515,7 +1563,9 @@ async function processPdf(att, text){
     return `[El usuario subió un PDF ("${att.name}") que no parece un estudio médico. Texto:]\n"""\n${att.text.slice(0, 3000)}\n"""` + (text ? '\n' + text : '');
   }
   Object.assign(entry, { isStudy:true, kind:st.kind, studyDate:st.studyDate, lab:st.lab, values:st.values, summary:st.summary });
-  S.clinHist.push(entry);
+  const same = S.clinHist.findIndex(h => h.name === entry.name);
+  if(same >= 0){ S.clinHist[same] = entry; toast('Reemplacé el análisis anterior de ese mismo archivo.'); }
+  else S.clinHist.push(entry);
   const extra = [];
   if(st.weight && addWeight(st.weight, 'pdf', st.studyDate || undefined)) extra.push('peso ' + lastWeight().kg + ' kg');
   if(st.height && !S.height && setHeight(st.height)) extra.push('altura ' + S.height + ' cm');
