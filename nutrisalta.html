@@ -631,7 +631,7 @@ const MODEL        = 'llama-3.3-70b-versatile'; // preferido; si Groq lo da de b
 // Si falla, se cae al MODEL de texto con la descripción "[El usuario envió una foto...]".
 const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
 const STORE_KEY    = 'ns_v4';
-const APP_VERSION  = '2.2 · 16 nov 2026'; // subir en cada cambio para verificar que el celular se actualizó
+const APP_VERSION  = '2.3 · 16 nov 2026'; // subir en cada cambio para verificar que el celular se actualizó
 const FORMAT_REMINDER = '(Respondé de vos, como en Salta (probá, sumá, acompañá; nunca "añade" ni "prueba"), en máximo 4 líneas, una sola idea, sin listas ni tablas. Terminá con un 👉 de una sola acción.)';
 const MAX_REPLY_CHARS = 420;
 const MAX_SAVED    = 60;   // msgs guardados
@@ -2579,7 +2579,14 @@ async function processPendingStudies(){
       if(st.weight) addWeight(st.weight, 'pdf', st.studyDate || undefined);
       save(); refreshPanels();
       toast(`Analicé tu ${st.kind.toLowerCase()} pendiente: ${st.values.length} valores guardados.`);
-    }catch(e){ if(e.kind === 'network') return; console.warn('[NutriSalta] Estudio pendiente falló:', e); }
+    }catch(e){
+      if(e.kind === 'network') return;   // sin servicio: se reintenta la próxima vez que haya conexión
+      console.warn('[NutriSalta] Estudio pendiente falló:', e);
+      // tope de 3 intentos para no reintentar para siempre un PDF que no se puede leer
+      h.tries = (h.tries || 0) + 1;
+      if(h.tries >= 3){ delete h.pending; delete h.rawText; h.kind = 'Estudio (no se pudo analizar)'; refreshPanels(); }
+      save();
+    }
   }
 }
 
