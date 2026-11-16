@@ -10,6 +10,17 @@ Asistente de nutrición para personas con artrosis, con foco en la gastronomía 
   - iPhone/Safari: Compartir → *Agregar a inicio*.
 - La clave de Groq se pide una sola vez y queda guardada en el dispositivo.
 
+## Si Groq falla
+
+La app prueba en orden y usa el primero que responde:
+
+1. **Groq**, con tu clave.
+2. **Google Gemini**, con una clave gratuita de [AI Studio](https://aistudio.google.com/apikey). Es opcional y se carga en *Mis datos → Conexión avanzada*.
+3. **Pollinations.ai**: servicio público y gratuito, sin clave. Se puede desactivar.
+4. Modelos del teléfono sin conexión (ver abajo).
+
+Cada respuesta indica de qué servicio vino.
+
 ## Sin internet
 
 | Qué | Sin conexión |

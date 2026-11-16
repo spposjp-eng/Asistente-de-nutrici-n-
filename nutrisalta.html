@@ -379,6 +379,8 @@ main{flex:1;overflow:hidden;position:relative}
 details.adv{margin:4px 0 12px;font-size:var(--fs-sm)}
 details.adv summary{cursor:pointer;color:var(--text-2)}
 details.adv .field{margin-top:10px}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:var(--fs-sm);margin:4px 0 8px;cursor:pointer}
+.check input{margin-top:3px;accent-color:var(--brand);width:16px;height:16px;flex:none}
 
 /* ---------- Toast ---------- */
 #toast{position:fixed;left:50%;bottom:96px;transform:translate(-50%,20px);background:var(--text);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:var(--fs-sm);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:60;max-width:calc(100% - 32px);text-align:center}
@@ -425,9 +427,9 @@ details.adv .field{margin-top:10px}
         </div>
       </div>
       <div class="field hidden" id="s-key-wrap">
-        <label for="s-key">Clave de Groq</label>
+        <label for="s-key">Clave de Groq (opcional)</label>
         <input id="s-key" type="password" autocomplete="off" placeholder="gsk_…">
-        <span class="hint">Se guarda solo en este navegador.</span>
+        <span class="hint">Opcional. Se guarda solo en este navegador. Sin clave uso un servicio público gratuito.</span>
       </div>
       <button class="btn btn-primary" style="width:100%;margin-top:8px" type="submit">Empezar</button>
     </form>
@@ -549,6 +551,12 @@ details.adv .field{margin-top:10px}
           <select id="m-model"><option value="">Automático (recomendado)</option></select>
           <span class="hint" id="m-model-hint">Se elige solo entre los que tiene tu cuenta de Groq.</span>
         </div>
+        <div class="field">
+          <label for="m-gkey">Clave de Google Gemini (opcional, gratis)</label>
+          <input id="m-gkey" type="password" autocomplete="off" placeholder="AIza…">
+          <span class="hint">Respaldo si Groq falla. Se crea gratis en <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.</span>
+        </div>
+        <label class="check"><input type="checkbox" id="m-public"> <span>Si fallan los anteriores, usar el servicio público gratuito <b>Pollinations.ai</b> (sin clave).<br><span class="hint">Es un servicio abierto: tus mensajes pasan por sus servidores. Desactivalo si preferís no compartir tus datos de salud.</span></span></label>
       </details>
     </div>
     <footer>
@@ -855,10 +863,10 @@ TEXTO:
 """
 ${text}
 """`;
-  const raw = await callGroq([
+  const { text: raw } = await aiChat([
     { role:'system', content:'Sos un extractor de datos de estudios médicos. Respondés únicamente JSON válido.' },
     { role:'user', content:prompt }
-  ], MODEL, { json:true, temperature:0.1, max_tokens:2000 });
+  ], { json:true, temperature:0.1, max_tokens:2000, allowLocal:false });
   let j;
   try{ j = JSON.parse(raw); }
   catch(e){
@@ -1078,16 +1086,9 @@ async function send(){
     const messages = [{ role:'system', content:systemPrompt() }, ...ctx];
 
     setStatusText('Escribiendo…');
-    let reply, engine = 'groq';
-    try{
-      if(att && att.type === 'img') reply = await sendWithImage(messages, att.dataUrl);
-      else reply = await callGroq(messages, MODEL);
-    }catch(err){
-      if(err.kind !== 'network') throw err;
-      // Sin internet: modelos de Google en el dispositivo (Gemini Nano / Gemma) o respuestas locales
-      const r = await offlineAnswer(ctx, att);
-      reply = r.text; engine = r.engine;
-    }
+    // Groq → Gemini → servicio público → modelos del teléfono (sin conexión)
+    const r = (att && att.type === 'img') ? await answerWithImage(messages, att.dataUrl, ctx, att) : await aiChat(messages, { ctx, att });
+    const reply = r.text, engine = r.engine;
     const mem = absorbMemory(reply);
     typingRow.remove();
     const botMsg = { role:'assistant', content:mem.body, ts:Date.now() };
@@ -1097,7 +1098,7 @@ async function send(){
     renderMsg(botMsg);
     const all = [...new Set([...learned, ...mem.found])];
     if(all.length) toast('Lo anoto: ' + all.join(' · '));
-    setStatus(engine === 'groq' ? true : 'offline');
+    setStatus(engine === 'groq' || PROVIDER_NAMES[engine] ? true : 'offline');
   }catch(err){
     typingRow.remove();
     renderError(err.message);
@@ -1154,7 +1155,7 @@ ${text ? '\nPregunta del usuario: ' + text : '\nExplicale en simple qué signifi
 }
 
 // Intenta con modelo de visión enviando la imagen real; si falla, cae al modelo de texto.
-async function sendWithImage(messages, dataUrl){
+async function answerWithImage(messages, dataUrl, ctx, att){
   const vis = messages.slice();
   const last = vis[vis.length-1];
   vis[vis.length-1] = {
@@ -1168,15 +1169,152 @@ async function sendWithImage(messages, dataUrl){
   const sys = vis.shift();
   vis[vis.length-1].content[0].text = sys.content + '\n\n---\n' + vis[vis.length-1].content[0].text;
   try{
-    return await callGroq(vis.slice(-6), VISION_MODEL);
+    return await aiChat(vis.slice(-6), { vision:true, allowLocal:false });
   }catch(err){
-    console.warn('[NutriSalta] Visión no disponible, uso modelo de texto:', err.message);
-    if(err.kind === 'network') throw err;
+    console.warn('[NutriSalta] Ningún proveedor pudo ver la foto, sigo solo con texto:', err.message);
     const fallback = messages.slice();
     fallback[fallback.length-1] = { role:'user', content: last.content +
       '\n(No pudiste ver la imagen. Pedile amablemente que te cuente qué plato es y la porción, y mientras tanto dale pautas generales para armar un plato saludable para la artrosis.)' };
-    return await callGroq(fallback, MODEL);
+    return await aiChat(fallback, { ctx, att });
   }
+}
+
+/* ===================== PROVEEDORES DE IA (respaldo en cadena) =====================
+   1) Groq (clave propia)  2) Google Gemini (clave gratuita de AI Studio, opcional)
+   3) Pollinations.ai: servicio público y gratuito, sin clave  4) modelos del teléfono sin conexión */
+const GEM_BASE = 'https://generativelanguage.googleapis.com/v1beta/openai';
+const GEM_DEFAULT = 'gemini-2.5-flash';
+const PUBLIC_URL = 'https://text.pollinations.ai';
+const PROVIDER_NAMES = { groq:'Groq', gemini:'Google Gemini', publica:'servicio público Pollinations' };
+const geminiKey = () => (lsGet(STORE_KEY + '_gkey') || '').trim();
+const publicEnabled = () => lsGet(STORE_KEY + '_public') !== '0';
+
+function providers(o){
+  const list = [];
+  if(apiKey())        list.push({ id:'groq',    fn: (m, op) => callGroq(m, op.vision ? VISION_MODEL : MODEL, op) });
+  if(geminiKey())     list.push({ id:'gemini',  fn: callGemini });
+  if(publicEnabled()) list.push({ id:'publica', fn: callPublic });
+  return list;
+}
+// Devuelve {text, engine}. allowLocal:false → si fallan todos, error (kind 'network') en vez de responder local.
+async function aiChat(messages, o){
+  o = o || {};
+  const errs = [];
+  if(navigator.onLine !== false){
+    for(const pv of providers(o)){
+      try{
+        if(pv.id !== 'groq') setStatusText('Groq no respondió · probando ' + PROVIDER_NAMES[pv.id] + '…');
+        const text = await pv.fn(messages, o);
+        if(text && text.trim()) return { text, engine: pv.id === 'groq' ? 'groq' : pv.id };
+        throw Object.assign(new Error('Respuesta vacía'), { kind:'empty' });
+      }catch(e){
+        errs.push(e);
+        console.warn('[NutriSalta] ' + PROVIDER_NAMES[pv.id] + ' falló (' + (e.status || e.kind || '') + '):', e.message);
+      }
+    }
+  }
+  if(o.allowLocal === false){
+    const e = new Error(errs.length ? 'Ningún servicio de IA respondió. ' + errs[errs.length-1].message : 'Sin conexión a internet.');
+    e.kind = 'network'; e.causes = errs; throw e;
+  }
+  return await offlineAnswer(o.ctx || messages.filter(m => m.role !== 'system'), o.att);
+}
+
+async function fetchT(url, init, ms){
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), ms || 60000);
+  try{ return await fetch(url, Object.assign({}, init, { signal: ctl.signal })); }
+  finally{ clearTimeout(t); }
+}
+// POST estilo OpenAI con errores de red y de respuesta separados
+async function postOpenAI(url, key, body, label){
+  let res;
+  const headers = { 'Content-Type':'application/json' };
+  if(key) headers['Authorization'] = 'Bearer ' + key;
+  try{ res = await fetchT(url, { method:'POST', headers, body: JSON.stringify(body) }); }
+  catch(netErr){
+    console.error('[NutriSalta] Error de RED con ' + label + ':', netErr);
+    throw Object.assign(new Error(netErr.name === 'AbortError' ? label + ' tardó demasiado.' : 'Sin conexión con ' + label + '.'), { kind:'network' });
+  }
+  if(!res.ok){
+    let t = ''; try{ t = await res.text(); }catch(_){}
+    console.error('[NutriSalta] ' + label + ' respondió HTTP ' + res.status + ':', t);
+    let detail = ''; try{ const j = JSON.parse(t); detail = (j.error && (j.error.message || j.error)) || j.message || ''; }catch(_){ detail = t.slice(0, 200); }
+    if(Array.isArray(detail)) detail = JSON.stringify(detail);
+    throw Object.assign(new Error(label + ' respondió ' + res.status + (detail ? ': ' + String(detail).slice(0, 160) : '')), { kind:'http', status:res.status, detail:String(detail) });
+  }
+  let data; try{ data = await res.json(); }catch(_){ throw Object.assign(new Error(label + ': respuesta ilegible.'), { kind:'parse' }); }
+  const out = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+  if(!out) throw Object.assign(new Error(label + ': respuesta vacía.'), { kind:'empty' });
+  return cleanOut(out);
+}
+function cleanOut(t){
+  return String(t)
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/\n+-{3,}\s*\n+\s*\*{0,2}(sponsor|ad|anuncio)[\s\S]*$/i, '')   // avisos que agrega el servicio público
+    .replace(/\n+🌸[\s\S]*$/u, '')
+    .trim();
+}
+
+/* --- Google Gemini (endpoint compatible con OpenAI) --- */
+async function geminiModel(){
+  try{ const c = JSON.parse(lsGet(STORE_KEY + '_gmodel') || 'null'); if(c && Date.now() - c.ts < 24*3600e3) return c.id; }catch(_){}
+  let id = GEM_DEFAULT;
+  try{
+    const res = await fetchT(GEM_BASE + '/models', { headers:{ 'Authorization':'Bearer ' + geminiKey() } }, 15000);
+    if(res.ok){
+      const ids = ((await res.json()).data || []).map(m => String(m.id).replace(/^models\//, ''))
+        .filter(x => /^gemini-[\d.]+-flash/.test(x) && !/image|tts|live|audio|embed|thinking|exp|preview/i.test(x));
+      const ver = x => parseFloat((x.match(/gemini-([\d.]+)/) || [0, 0])[1]);
+      ids.sort((a, b) => (ver(b) - ver(a)) || (/lite/.test(a) - /lite/.test(b)) || a.length - b.length);
+      if(ids.length) id = ids[0];
+    }else console.warn('[NutriSalta] Gemini /models HTTP ' + res.status);
+  }catch(e){ console.warn('[NutriSalta] No pude listar modelos de Gemini:', e.message); }
+  lsSet(STORE_KEY + '_gmodel', JSON.stringify({ id, ts: Date.now() }));
+  return id;
+}
+async function callGemini(messages, o){
+  o = o || {};
+  const model = await geminiModel();
+  const body = { model, messages, temperature: o.temperature ?? 0.6, max_tokens: o.max_tokens || 1024 };
+  if(o.json) body.response_format = { type:'json_object' };
+  try{ return await postOpenAI(GEM_BASE + '/chat/completions', geminiKey(), body, 'Gemini'); }
+  catch(e){
+    if(e.kind === 'http' && e.status === 400 && o.json){ delete body.response_format; return await postOpenAI(GEM_BASE + '/chat/completions', geminiKey(), body, 'Gemini'); }
+    if(e.kind === 'http' && e.status === 404) lsSet(STORE_KEY + '_gmodel', null);
+    throw e;
+  }
+}
+
+/* --- Pollinations.ai: público, gratis, sin clave --- */
+const textOnly = msgs => msgs.map(m => ({ role:m.role, content: Array.isArray(m.content) ? m.content.filter(c => c.type === 'text').map(c => c.text).join('\n') : m.content }));
+async function callPublic(messages, o){
+  o = o || {};
+  // a) endpoint compatible con OpenAI (acepta imágenes)
+  try{
+    const body = { model:'openai', messages, temperature: o.temperature ?? 0.6, private:true };
+    if(o.json) body.response_format = { type:'json_object' };
+    return await postOpenAI(PUBLIC_URL + '/openai', null, body, 'Pollinations');
+  }catch(e){ console.warn('[NutriSalta] Pollinations /openai:', e.message); }
+  // b) POST simple que devuelve texto
+  try{
+    const res = await fetchT(PUBLIC_URL + '/', { method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ messages: textOnly(messages), model:'openai', jsonMode: !!o.json, private:true }) });
+    if(res.ok){ const t = cleanOut(await res.text()); if(t) return t; }
+    else console.warn('[NutriSalta] Pollinations POST HTTP ' + res.status + ':', (await res.text()).slice(0, 200));
+  }catch(e){ console.warn('[NutriSalta] Pollinations POST:', e.message); }
+  // c) GET con el texto en la URL (último intento; recorto el contexto)
+  const flat = textOnly(messages);
+  const sys = (flat.find(m => m.role === 'system') || {}).content || '';
+  const conv = flat.filter(m => m.role !== 'system').slice(-3).map(m => (m.role === 'user' ? 'Usuario: ' : 'Asistente: ') + m.content).join('\n');
+  const prompt = (conv + '\nAsistente:').slice(-1500);
+  const url = PUBLIC_URL + '/' + encodeURIComponent(prompt) + '?model=openai&private=true' + (o.json ? '&json=true' : '') + '&system=' + encodeURIComponent(sys.slice(0, 1200));
+  let res;
+  try{ res = await fetchT(url, {}, 60000); }
+  catch(e){ throw Object.assign(new Error('Sin conexión con el servicio público.'), { kind:'network' }); }
+  if(!res.ok){ const t = await res.text().catch(() => ''); console.error('[NutriSalta] Pollinations GET HTTP ' + res.status + ':', t.slice(0, 200)); throw Object.assign(new Error('El servicio público respondió ' + res.status), { kind:'http', status:res.status }); }
+  const t = cleanOut(await res.text());
+  if(!t) throw Object.assign(new Error('Respuesta vacía del servicio público'), { kind:'empty' });
+  return t;
 }
 
 /* ===================== ADJUNTOS ===================== */
@@ -1294,7 +1432,8 @@ function renderMsg(m, imgUrl, noScroll){
   }else{
     inner = md(m.content);
   }
-  inner += `<span class="meta">${fmtTime(m.ts)}${m.engine ? ' · sin conexión (' + esc(ENGINE_NAMES[m.engine] || m.engine) + ')' : ''}</span>`;
+  const eng = !m.engine ? '' : PROVIDER_NAMES[m.engine] ? ' · vía ' + esc(PROVIDER_NAMES[m.engine]) : ' · sin conexión (' + esc(ENGINE_NAMES[m.engine] || m.engine) + ')';
+  inner += `<span class="meta">${fmtTime(m.ts)}${eng}</span>`;
   if(m.role !== 'user' && imgCache[m.ts]) inner += `<div class="bot-actions"><button class="btn btn-ghost" data-logimg="${m.ts}">Anotar este plato en el diario</button></div>`;
   row.innerHTML = (m.role === 'user' ? '' : '<div class="avatar" aria-hidden="true">NS</div>') + `<div class="bubble">${inner}</div>`;
   const lb = row.querySelector('[data-logimg]');
@@ -1804,12 +1943,12 @@ Un ítem por alimento distinto. Números sin unidades. Si no hay comida identifi
   let raw;
   if(dataUrl){
     try{
-      raw = await callGroq([{ role:'user', content:[{ type:'text', text:instr }, { type:'image_url', image_url:{ url:dataUrl } }] }], VISION_MODEL, { json:true, temperature:0.2, max_tokens:800 });
+      raw = (await aiChat([{ role:'user', content:[{ type:'text', text:instr }, { type:'image_url', image_url:{ url:dataUrl } }] }], { vision:true, json:true, temperature:0.2, max_tokens:800, allowLocal:false })).text;
     }catch(err){
-      if(err.kind === 'network' || !text) throw err.kind === 'network' ? err : new Error('No pude analizar la foto. Describí el plato con palabras y probá de nuevo.');
+      if(!text) throw navigator.onLine === false ? err : new Error('No pude analizar la foto. Describí el plato con palabras y probá de nuevo.');
     }
   }
-  if(!raw) raw = await callGroq([{ role:'system', content:'Sos un nutricionista que estima calorías y macronutrientes. Respondés solo JSON válido.' }, { role:'user', content:instr }], MODEL, { json:true, temperature:0.2, max_tokens:800 });
+  if(!raw) raw = (await aiChat([{ role:'system', content:'Sos un nutricionista que estima calorías y macronutrientes. Respondés solo JSON válido.' }, { role:'user', content:instr }], { json:true, temperature:0.2, max_tokens:800, allowLocal:false })).text;
   let j; try{ j = JSON.parse(raw); }catch(_){ const m = raw.match(/\{[\s\S]*\}/); j = m ? JSON.parse(m[0]) : { items:[] }; }
   const num = v => { const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) && n >= 0 ? n : 0; };
   return (Array.isArray(j.items) ? j.items : []).map(i => ({
@@ -1988,7 +2127,9 @@ const RULES = [
   [/receta|cocin|prepar/i, () => `Una receta fácil: guiso de quínoa con verduras.\n- Rehogá cebolla, morrón y zapallo.\n- Agregá 1 taza de quínoa lavada y 2 de caldo.\n- Cociná 15 minutos y sumá arvejas.\n\n👉 Hacé de más y guardá porciones para otro día.`]
 ];
 function ruleAnswer(q, att){
-  const note = '_Sin internet: te doy una respuesta corta. Cuando vuelva la conexión puedo darte más detalle._\n\n';
+  const note = navigator.onLine === false
+    ? '_Sin internet: te doy una respuesta corta. Cuando vuelva la conexión puedo darte más detalle._\n\n'
+    : '_Los servicios de IA no respondieron ahora, así que te doy una respuesta corta. Probá de nuevo en un rato._\n\n';
   if(att && att.type === 'img') return note + `Sin conexión no puedo ver la foto. Contame qué plato es y lo anotamos en la pestaña Hoy.\n\n👉 Mientras tanto: que la mitad del plato sean verduras.`;
   const hit = RULES.find(([re]) => re.test(q));
   return note + (hit ? hit[1](S.name) : `Ahora no tengo internet para responderte bien eso. Mientras tanto podés anotar tus comidas, el agua y cómo te sentís en la pestaña Hoy, y lo charlamos cuando vuelva la conexión.\n\n👉 Un consejo para hoy: tomá agua y sumá una verdura más en tu próxima comida.`);
@@ -2141,6 +2282,7 @@ function openModal(){
   $('#m-sex').value = S.sex || ''; $('#m-act').value = S.activity || 'baja'; $('#m-goalw').value = S.weightGoal || '';
   try{ $('#m-key').value = localStorage.getItem(STORE_KEY+'_key') || ''; }catch(_){}
   fillModelSelect();
+  $('#m-gkey').value = geminiKey(); $('#m-public').checked = publicEnabled();
   $('#modal').classList.remove('hidden');
   setTimeout(() => $('#m-name').focus(), 30);
 }
@@ -2202,8 +2344,7 @@ function init(){
     if(!age || +age < 1 || +age > 120){ toast('Revisá la edad.', true); $('#s-age').focus(); return; }
     if(!apiKey()){
       const k = $('#s-key').value.trim();
-      if(!k){ toast('Pegá tu clave de Groq para poder conversar.', true); $('#s-key').focus(); return; }
-      try{ localStorage.setItem(STORE_KEY+'_key', k); }catch(_){}
+      if(k){ try{ localStorage.setItem(STORE_KEY+'_key', k); }catch(_){} }
     }
     S.name = name; S.age = age; S.goals = $('#s-goals').value.trim();
     S.since = S.since || new Date().toISOString();
@@ -2269,6 +2410,9 @@ function init(){
       const prevKey = localStorage.getItem(STORE_KEY+'_key') || '';
       if(k) localStorage.setItem(STORE_KEY+'_key', k); else localStorage.removeItem(STORE_KEY+'_key');
       if(k !== prevKey){ localStorage.removeItem(STORE_KEY+'_models'); modelsCache = null; badModels.clear(); }
+      const gk = $('#m-gkey').value.trim();
+      if(gk !== geminiKey()){ if(gk) localStorage.setItem(STORE_KEY+'_gkey', gk); else localStorage.removeItem(STORE_KEY+'_gkey'); localStorage.removeItem(STORE_KEY+'_gmodel'); }
+      localStorage.setItem(STORE_KEY+'_public', $('#m-public').checked ? '1' : '0');
       const mv = $('#m-model').value;
       if(mv) localStorage.setItem(STORE_KEY+'_model', mv); else localStorage.removeItem(STORE_KEY+'_model');
     }catch(_){}
